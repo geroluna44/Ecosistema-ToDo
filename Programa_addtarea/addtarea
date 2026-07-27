@@ -49,11 +49,6 @@ def slugify(title: str) -> str:
     return slug
 
 
-def read_multiline_stdin() -> str:
-    lines = [line.rstrip("\n") for line in sys.stdin]
-    return "\n".join(lines)
-
-
 def parse_args(argv):
     if argv and argv[0] in ("-h", "--help"):
         return None, None
@@ -111,19 +106,25 @@ def main() -> int:
         target = pool / f"{slug}-{n}.txt"
         n += 1
 
-    try:
-        if descripcion:
-            content = descripcion + "\n"
-        else:
-            if sys.stdin.isatty():
-                print(
-                    "Ingresa la descripcion (linea vacia para terminar):",
-                    file=sys.stderr,
-                )
-            content = read_multiline_stdin()
-            if content and not content.endswith("\n"):
-                content += "\n"
+    if descripcion:
+        content = descripcion + "\n"
+    else:
+        if sys.stdin.isatty():
+            print(
+                "Ingresa la descripcion (linea vacia para terminar):",
+                file=sys.stderr,
+            )
+        lines = []
+        for line in sys.stdin:
+            line = line.rstrip("\n")
+            if not line:
+                break
+            lines.append(line)
+        content = "\n".join(lines)
+        if content and not content.endswith("\n"):
+            content += "\n"
 
+    try:
         target.write_text(content, encoding="utf-8")
     except KeyboardInterrupt:
         print("\naddtarea: cancelado", file=sys.stderr)
