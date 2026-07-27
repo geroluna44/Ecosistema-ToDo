@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""addtarea: crea una tarea en ~/tareas/pool/.
+
+Uso:
+  addtarea TITULO
+  addtarea TITULO "descripcion"
+  printf "l1\\nl2\\n\\n" | addtarea TITULO
+
+Sin descripcion, lee de stdin hasta una linea vacia (o EOF).
+Imprime en stdout la ruta absoluta del archivo creado.
+
+Opciones:
+  -h, --help            Muestra esta ayuda.
+  --pool DIR            Sobreescribe el directorio destino.
+                        Tambien se puede definir con TAREAS_POOL.
+
+Exit codes:
+  0   exito
+  1   error de I/O
+  2   uso invalido
+  130 cancelado (Ctrl+C)
+"""
+
+import os
+import sys
+import unicodedata
+from pathlib import Path
+
+DEFAULT_POOL = Path.home() / "tareas" / "pool"
+
+
+def slugify(title: str) -> str:
+    text = unicodedata.normalize("NFC", title or "")
+    out = []
+    last_was_dash = False
+    for ch in text:
+        if ch.isspace():
+            if not last_was_dash and out:
+                out.append("-")
+                last_was_dash = True
+        elif ch in ("/", "\\") or ord(ch) < 32 or ord(ch) == 127:
+            continue
+        else:
+            out.append(ch)
+            last_was_dash = False
+    slug = "".join(out).strip("-")
+    if slug in ("", ".", ".."):
+        return ""
+    return slug
+
+
+def read_multiline_stdin() -> str:
+    lines = [line.rstrip("\n") for line in sys.stdin]
+    return "\n".join(lines)
+
+
+def parse_args(argv):
+    if argv and argv[0] in ("-h", "--help"):
+        return None, None
+    pool_override = os.environ.get("TAREAS_POOL")
+    pos = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("--pool", "-p"):
+            if i + 1 >= len(argv):
+                print("addtarea: --pool requiere un argumento", file=sys.stderr)
+                return None, 2
+            pool_override = argv[i + 1]
+            i += 2
+        else:
+            pos.append(a)
+            i += 1
+    return (pos, pool_override), None
+
+
+def main() -> int:
+    parsed, early = parse_args(sys.argv[1:])
+    if early is not None:
+        return early
+    if parsed is None:
+        print(__doc__)
+        return 0
+    pos, pool_override = parsed
+
+    if not pos:
+        print('Uso: addtarea TITULO ["descripcion"]', file=sys.stderr)
+        return 2
+
+    titulo = pos[0]
+    descripcion = " ".join(pos[1:]).strip() if len(pos) > 1 else None
+
+    slug = slugify(titulo)
+    if not slug:
+        print(
+            "addtarea: titulo invalido (vacio o solo caracteres no permitidos)",
+            file=sys.stderr,
+        )
+        return 2
+
+    pool = Path(pool_override).expanduser() if pool_override else DEFAULT_POOL
+    try:
+        pool.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"addtarea: no se pudo crear el pool {pool}: {e}", file=sys.stderr)
+        return 1
+
+    target = pool / f"{slug}.txt"
+    n = 2
+    while target.exists():
+        target = pool / f"{slug}-{n}.txt"
+        n += 1
+
+    try:
+        if descripcion:
+            content = descripcion + "\n"
+        else:
+            if sys.stdin.isatty():
+                print(
+                    "Ingresa la descripcion (linea vacia para terminar):",
+                    file=sys.stderr,
+                )
+            content = read_multiline_stdin()
+            if content and not content.endswith("\n"):
+                content += "\n"
+
+        target.write_text(content, encoding="utf-8")
+    except KeyboardInterrupt:
+        print("\naddtarea: cancelado", file=sys.stderr)
+        return 130
+    except OSError as e:
+        print(f"addtarea: no se pudo escribir {target}: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        print(str(target))
+    except BrokenPipeError:
+        return 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
