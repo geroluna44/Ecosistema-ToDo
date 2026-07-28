@@ -51,7 +51,6 @@ function measureNode(id: string, containerRect: DOMRect): NodePosition | null {
 export function SkillTree({ projects, onToggleComplete }: SkillTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<Map<string, NodePosition>>(new Map());
-  const [containerRect, setContainerRect] = useState<DOMRect | null>(null);
 
   const tasksMap = useMemo(() => {
     const map = new Map<string, TareaRelacionada>();
@@ -64,13 +63,11 @@ export function SkillTree({ projects, onToggleComplete }: SkillTreeProps) {
   const measureNodes = useCallback(() => {
     if (!containerRef.current) return;
     
-    const rect = containerRef.current.getBoundingClientRect();
-    setContainerRect(rect);
-    
+    const containerRect = containerRef.current.getBoundingClientRect();
     const newPositions = new Map<string, NodePosition>();
     projects.forEach((tareas) => {
       tareas.forEach((tarea) => {
-        const pos = measureNode(tarea.id, rect);
+        const pos = measureNode(tarea.id, containerRect);
         if (pos) newPositions.set(tarea.id, pos);
       });
     });

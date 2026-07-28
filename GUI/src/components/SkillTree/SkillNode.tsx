@@ -8,14 +8,16 @@ interface SkillNodeProps {
   onToggleComplete: (filename: string) => void;
 }
 
-function formatDeadline(deadline: number): string {
+function formatDeadline(deadline: number | undefined): string {
+  if (!deadline) return 'Sin fecha';
   const str = deadline.toString();
   const month = str.slice(4, 6);
   const day = str.slice(6, 8);
   return `${day}/${month}`;
 }
 
-function formatTime(minutes: number): string {
+function formatTime(minutes: number | undefined): string {
+  if (!minutes) return '0m';
   if (minutes < 60) return `${minutes}m`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -94,8 +96,8 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete }: SkillNodeProps)
         <div className="skill-node-meta">
           <span className="skill-node-time">⏱ {formatTime(tarea['Rango de tiempo'])}</span>
           <span className="skill-node-deadline">📅 {formatDeadline(tarea.Deadline)}</span>
-          <span className={`skill-node-urgency urgency-${tarea.Urgencia.toLowerCase()}`}>
-            {tarea.Urgencia}
+          <span className={`skill-node-urgency urgency-${(tarea.Urgencia || 'A').toLowerCase()}`}>
+            {tarea.Urgencia || '?'}
           </span>
         </div>
       </div>
@@ -114,8 +116,8 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete }: SkillNodeProps)
           <div className="tooltip-meta">
             <span className="tooltip-badge">⏱ {formatTime(tarea['Rango de tiempo'])}</span>
             <span className="tooltip-badge">📅 {formatDeadline(tarea.Deadline)}</span>
-            <span className={`tooltip-badge urgency-${tarea.Urgencia.toLowerCase()}`}>
-              Urgencia {tarea.Urgencia}
+            <span className={`tooltip-badge urgency-${(tarea.Urgencia || 'A').toLowerCase()}`}>
+              Urgencia {tarea.Urgencia || '?'}
             </span>
             {tarea['Primer paso'] && (
               <span className="tooltip-badge">→ {tarea['Primer paso']}</span>

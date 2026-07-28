@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Tarea, TareaRelacionada } from '../types/task';
-import { readTasks, writeTask, getTasksByProject } from '../services/taskService';
+import { readTasks, writeTask } from '../services/taskService';
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Map<string, Tarea>>(new Map());
@@ -48,23 +48,17 @@ export function useTasks() {
     }
   }, [tasks]);
 
-  const getTasksByProjectLocal = useCallback(() => {
-    return getTasksByProject(tasks);
-  }, [tasks]);
-
   return {
     tasks,
     loading,
     error,
     toggleComplete,
-    getTasksByProject: getTasksByProjectLocal,
     reload: loadTasks,
   };
 }
 
 export function buildSkillTree(tasks: Map<string, Tarea>): Map<string, TareaRelacionada[]> {
   const result = new Map<string, TareaRelacionada[]>();
-  const taskFiles = Array.from(tasks.keys());
   const taskArray = Array.from(tasks.entries());
   
   const childCount = new Map<string, number>();
