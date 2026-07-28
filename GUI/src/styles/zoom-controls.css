@@ -1,0 +1,81 @@
+.zoom-controls {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--bg-hover);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.zoom-controls.minimized {
+  padding: 4px 8px;
+}
+
+.zoom-controls.minimized .zoom-buttons {
+  display: none;
+}
+
+.zoom-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.zoom-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 4px;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease;
+}
+
+.zoom-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.zoom-btn:active {
+  background-color: var(--state-available);
+  color: var(--bg-main);
+}
+
+.zoom-level {
+  min-width: 50px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.zoom-level:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.zoom-controls-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-left: 1px solid var(--bg-hover);
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.zoom-controls-toggle:hover {
+  color: var(--text-primary);
+}

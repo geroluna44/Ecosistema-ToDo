@@ -1,17 +1,30 @@
 import { Tarea } from '../types/task';
 
 const TASKS_DIR = '/home/gero/tareas/clasificadas';
+const POOL_DIR = '/home/gero/tareas/pool';
 
 interface TaskServerConfig {
-  baseUrl: string;
+  listUrl: string;
+  getUrl: (filename: string) => string;
+  putUrl: (filename: string) => string;
+  postPoolUrl: string;
+  postTaskUrl: string;
 }
 
 const DEV_CONFIG: TaskServerConfig = {
-  baseUrl: 'http://localhost:8080',
+  listUrl: '/tareas/',
+  getUrl: (f: string) => `/tareas/${f}`,
+  putUrl: (f: string) => `/tareas/${f}`,
+  postPoolUrl: '/tareas/pool',
+  postTaskUrl: '/tareas/',
 };
 
 const PROD_CONFIG: TaskServerConfig = {
-  baseUrl: TASKS_DIR,
+  listUrl: TASKS_DIR,
+  getUrl: (f: string) => `${TASKS_DIR}/${f}`,
+  putUrl: (f: string) => `${TASKS_DIR}/${f}`,
+  postPoolUrl: POOL_DIR,
+  postTaskUrl: TASKS_DIR,
 };
 
 const isDevelopment = import.meta.env.DEV;
@@ -22,19 +35,11 @@ export function configureTaskServer(config: Partial<TaskServerConfig>) {
   serverConfig = { ...serverConfig, ...config };
 }
 
-function getListUrl(): string {
-  return `${serverConfig.baseUrl}/`;
-}
-
-function getFileUrl(filename: string): string {
-  return `${serverConfig.baseUrl}/${filename}`;
-}
-
 export async function readTasks(): Promise<Map<string, Tarea>> {
   const tasks = new Map<string, Tarea>();
 
   try {
-    const response = await fetch(getListUrl());
+    const response = await fetch(serverConfig.listUrl);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -51,7 +56,7 @@ export async function readTasks(): Promise<Map<string, Tarea>> {
     const fileContents = await Promise.all(
       filenames.map(async (filename) => {
         try {
-          const fileResponse = await fetch(getFileUrl(filename));
+          const fileResponse = await fetch(serverConfig.getUrl(filename));
           if (fileResponse.ok) {
             return { filename, task: await fileResponse.json() as Tarea };
           }
@@ -76,7 +81,7 @@ export async function readTasks(): Promise<Map<string, Tarea>> {
 }
 
 export async function writeTask(filename: string, task: Tarea): Promise<void> {
-  const response = await fetch(getFileUrl(filename), {
+  const response = await fetch(serverConfig.putUrl(filename), {
     method: 'PUT',
     body: JSON.stringify(task, null, 4),
     headers: {
@@ -87,4 +92,54 @@ export async function writeTask(filename: string, task: Tarea): Promise<void> {
   if (!response.ok) {
     throw new Error(`Failed to write ${filename}: HTTP ${response.status}`);
   }
+}
+
+export interface PoolTaskInput {
+  nombre: string;
+  descripcion: string;
+}
+
+export interface ClasificadaTaskInput {
+  nombre: string;
+  lugar: string;
+  proyecto: string;
+  descripcion: string;
+  primer_paso: string;
+  rango_tiempo: number;
+  urgencia: 'A' | 'B' | 'C';
+  deadline: number;
+  tarea_padre: string;
+  tarea_hija: string;
+}
+
+export async function createPoolTask(input: PoolTaskInput): Promise<{ filename: string }> {
+  const response = await fetch(serverConfig.postPoolUrl, {
+    method: 'POST',
+    body: JSON.stringify(input),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create pool task: HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+export async function createClasificadaTask(input: ClasificadaTaskInput): Promise<{ filename: string }> {
+  const response = await fetch(serverConfig.postTaskUrl, {
+    method: 'POST',
+    body: JSON.stringify(input),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create task: HTTP ${response.status}`);
+  }
+
+  return response.json();
 }

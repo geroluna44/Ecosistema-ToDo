@@ -30,9 +30,32 @@
   position: relative;
 }
 
+.tree-viewport {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+}
+
+.tree-viewport.panning {
+  cursor: grabbing;
+}
+
+.tree-viewport.panning .skill-tree {
+  pointer-events: none;
+}
+
+.tree-transform-layer {
+  transform-origin: 0 0;
+  width: max-content;
+  transition: transform 0.1s ease;
+}
+
 .view-selector {
-  position: absolute;
-  top: 12px;
+  position: fixed;
+  top: 70px;
   right: 12px;
   z-index: 100;
   display: flex;
@@ -96,15 +119,18 @@
 }
 
 .tooltip {
-  position: fixed;
+  position: absolute;
   z-index: 1000;
   padding: 12px 16px;
   background-color: var(--bg-card);
   border: 1px solid var(--connection);
   border-radius: 8px;
-  max-width: 300px;
+  min-width: 350px;
+  max-width: 400px;
   pointer-events: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  left: calc(100% + 10px);
+  top: 0;
 }
 
 .tooltip-title {
@@ -156,4 +182,33 @@
 .tooltip-badge.urgency-c {
   background-color: var(--state-available);
   color: var(--bg-main);
+}
+
+.layout-selector {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+}
+
+.layout-selector-select {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--bg-hover);
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+
+.layout-selector-select:hover {
+  border-color: var(--connection);
+}
+
+.layout-selector-select:focus-visible {
+  outline: 2px solid var(--state-available);
+  outline-offset: 2px;
 }

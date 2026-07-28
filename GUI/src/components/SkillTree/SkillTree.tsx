@@ -6,6 +6,8 @@ import './skill-tree.css';
 interface SkillTreeProps {
   projects: Map<string, TareaRelacionada[]>;
   onToggleComplete: (filename: string) => void;
+  onEditTask: (filename: string) => void;
+  zoom: number;
 }
 
 interface NodePosition {
@@ -16,41 +18,42 @@ interface NodePosition {
   height: number;
 }
 
-interface Connection {
-  from: NodePosition;
-  to: NodePosition;
-}
+const NODE_W = 260;
+const NODE_H = 80;
+const COL_GAP = 60;
+const ROW_GAP = 20;
 
-function buildConnections(connections: Connection[]): string[] {
-  return connections.map(({ from, to }) => {
-    const startX = from.x + from.width / 2;
-    const startY = from.y + from.height;
-    const endX = to.x + to.width / 2;
-    const endY = to.y;
-    
-    const midY = (startY + endY) / 2;
-    
-    return `M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`;
+function computeLayout(
+  projects: Map<string, TareaRelacionada[]>,
+  _tasksMap: Map<string, TareaRelacionada>,
+): Map<string, NodePosition> {
+  const positions = new Map<string, NodePosition>();
+
+  let colX = 40;
+  projects.forEach((tareas) => {
+    let rowY = 40;
+    tareas.forEach((tarea) => {
+      positions.set(tarea.id, {
+        id: tarea.id,
+        x: colX,
+        y: rowY,
+        width: NODE_W,
+        height: NODE_H,
+      });
+      rowY += NODE_H + ROW_GAP;
+    });
+    colX += NODE_W + COL_GAP;
   });
+
+  return positions;
 }
 
-function measureNode(id: string, containerRect: DOMRect): NodePosition | null {
-  const el = document.getElementById(`node-${id}`);
-  if (!el) return null;
-  
-  const rect = el.getBoundingClientRect();
-  return {
-    id,
-    x: rect.left - containerRect.left,
-    y: rect.top - containerRect.top,
-    width: rect.width,
-    height: rect.height,
-  };
-}
-
-export function SkillTree({ projects, onToggleComplete }: SkillTreeProps) {
+export function SkillTree({ projects, onToggleComplete, onEditTask, zoom }: SkillTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [positions, setPositions] = useState<Map<string, NodePosition>>(new Map());
+  const dragRef = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null);
+  const wasDraggedRef = useRef(false);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
 
   const tasksMap = useMemo(() => {
     const map = new Map<string, TareaRelacionada>();
@@ -60,76 +63,121 @@ export function SkillTree({ projects, onToggleComplete }: SkillTreeProps) {
     return map;
   }, [projects]);
 
-  const measureNodes = useCallback(() => {
-    if (!containerRef.current) return;
-    
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const newPositions = new Map<string, NodePosition>();
-    projects.forEach((tareas) => {
-      tareas.forEach((tarea) => {
-        const pos = measureNode(tarea.id, containerRect);
-        if (pos) newPositions.set(tarea.id, pos);
-      });
-    });
-    setPositions(newPositions);
-  }, [projects]);
+  const [nodePositions, setNodePositions] = useState<Map<string, NodePosition>>(() => {
+    return computeLayout(projects, tasksMap);
+  });
 
   useEffect(() => {
-    const timeoutId = requestAnimationFrame(measureNodes);
-    return () => cancelAnimationFrame(timeoutId);
-  }, [measureNodes]);
-
-  const connections = useMemo(() => {
-    const conns: Connection[] = [];
-    projects.forEach((tareas) => {
-      tareas.forEach((tarea) => {
-        if (tarea['Tarea Padre']) {
-          const parentPos = positions.get(tarea['Tarea Padre']);
-          const childPos = positions.get(tarea.id);
-          if (parentPos && childPos) {
-            conns.push({ from: parentPos, to: childPos });
-          }
+    setNodePositions(prev => {
+      const next = new Map(prev);
+      const layout = computeLayout(projects, tasksMap);
+      layout.forEach((pos, id) => {
+        if (!next.has(id)) {
+          next.set(id, pos);
         }
       });
+      return next;
     });
-    return buildConnections(conns);
-  }, [projects, positions]);
+  }, [projects, tasksMap]);
+
+  useEffect(() => {
+    const newPositions = new Map(nodePositions);
+    let changed = false;
+    nodePositions.forEach((pos, id) => {
+      const el = document.getElementById(`node-${id}`);
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const actualW = rect.width / zoom;
+      const actualH = rect.height / zoom;
+      if (Math.abs(actualW - pos.width) > 3 || Math.abs(actualH - pos.height) > 3) {
+        newPositions.set(id, { ...pos, width: actualW, height: actualH });
+        changed = true;
+      }
+    });
+    if (changed) {
+      setNodePositions(newPositions);
+    }
+  }, [zoom]);
 
   const projectsArray = useMemo(() => Array.from(projects.entries()), [projects]);
+
+  const handleNodeMouseDown = useCallback((e: React.MouseEvent, taskId: string) => {
+    e.stopPropagation();
+    const pos = nodePositions.get(taskId);
+    if (!pos) return;
+
+    dragRef.current = {
+      id: taskId,
+      lastX: e.clientX,
+      lastY: e.clientY,
+      moved: false,
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+
+      const dx = (e.clientX - d.lastX) / zoomRef.current;
+      const dy = (e.clientY - d.lastY) / zoomRef.current;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+        d.moved = true;
+        wasDraggedRef.current = true;
+      }
+      d.lastX = e.clientX;
+      d.lastY = e.clientY;
+
+      setNodePositions(prev => {
+        const p = prev.get(d.id);
+        if (!p) return prev;
+        const next = new Map(prev);
+        next.set(d.id, { ...p, x: p.x + dx, y: p.y + dy });
+        return next;
+      });
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      dragRef.current = null;
+      setTimeout(() => { wasDraggedRef.current = false; }, 0);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [nodePositions]);
 
   return (
     <div className="skill-tree" ref={containerRef}>
       <div className="skill-tree-content">
-        <svg 
-          className="skill-connections"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            overflow: 'visible',
-          }}
-        >
-          {connections.map((path, i) => (
-            <path key={i} d={path} />
-          ))}
-        </svg>
-        
+
         {projectsArray.map(([proyecto, tareas]) => (
-          <div key={proyecto} className="skill-project">
-            <div className="skill-project-title">{proyecto}</div>
-            {tareas.map((tarea) => (
-              <div key={tarea.id} className="skill-nodes-row">
-                <div id={`node-${tarea.id}`}>
+          <div key={proyecto}>
+            {tareas.map((tarea) => {
+              const pos = nodePositions.get(tarea.id);
+              if (!pos) return null;
+              return (
+                <div
+                  key={tarea.id}
+                  id={`node-${tarea.id}`}
+                  className="skill-node-wrapper"
+                  style={{
+                    position: 'absolute',
+                    left: pos.x,
+                    top: pos.y,
+                    width: pos.width,
+                  }}
+                  onMouseDown={(e) => handleNodeMouseDown(e, tarea.id)}
+                >
                   <SkillNode
                     tarea={tarea}
                     tasksMap={tasksMap}
                     onToggleComplete={onToggleComplete}
+                    onEdit={onEditTask}
+                    wasDraggedRef={wasDraggedRef}
                   />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </div>
