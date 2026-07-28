@@ -1,0 +1,159 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--bg-hover);
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.app-main {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.view-selector {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background-color: var(--bg-card);
+  border-radius: 8px;
+  border: 1px solid var(--bg-hover);
+}
+
+.view-selector.minimized {
+  padding: 4px 8px;
+}
+
+.view-selector.minimized .view-selector-icons {
+  display: none;
+}
+
+.view-selector-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  font-size: 16px;
+  transition: background-color 0.15s ease;
+}
+
+.view-selector-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.view-selector-btn.active {
+  background-color: var(--state-available);
+  color: var(--bg-main);
+}
+
+.view-selector-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-left: 1px solid var(--bg-hover);
+  margin-left: 4px;
+}
+
+.loading,
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 14px;
+}
+
+.error {
+  color: var(--state-blocked);
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 1000;
+  padding: 12px 16px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--connection);
+  border-radius: 8px;
+  max-width: 300px;
+  pointer-events: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.tooltip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bg-hover);
+}
+
+.tooltip-project {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.tooltip-desc {
+  font-size: 12px;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.tooltip-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.tooltip-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.tooltip-badge.urgency-a {
+  background-color: var(--state-blocked);
+  color: var(--text-heading);
+}
+
+.tooltip-badge.urgency-b {
+  background-color: var(--state-postponed);
+  color: var(--bg-main);
+}
+
+.tooltip-badge.urgency-c {
+  background-color: var(--state-available);
+  color: var(--bg-main);
+}

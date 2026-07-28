@@ -1,0 +1,60 @@
+:root {
+  --bg-main: #0c1014;
+  --bg-card: #11151c;
+  --bg-hover: #0a3749;
+  --bg-selection: #091f2e;
+  --bg-elevated: #1e6479;
+
+  --text-primary: #99d1ce;
+  --text-heading: #d3ebe9;
+  --text-muted: #599cab;
+
+  --state-available: #2aa889;
+  --state-blocked: #c23127;
+  --state-postponed: #edb443;
+  --state-completed: #195466;
+
+  --connection: #33859E;
+  --connection-hover: #599cab;
+
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --node-min-width: 200px;
+  --node-max-width: 280px;
+  --node-gap-x: 60px;
+  --node-gap-y: 40px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-mono);
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--state-available);
+  outline-offset: 2px;
+}
