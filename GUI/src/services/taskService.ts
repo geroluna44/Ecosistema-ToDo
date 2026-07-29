@@ -2,6 +2,7 @@ import { Tarea } from '../types/task';
 
 const TASKS_DIR = '/home/gero/tareas/clasificadas';
 const POOL_DIR = '/home/gero/tareas/pool';
+const PAPELERA_DIR = '/home/gero/tareas/papelera';
 
 interface TaskServerConfig {
   listUrl: string;
@@ -126,6 +127,62 @@ export async function createPoolTask(input: PoolTaskInput): Promise<{ filename: 
   }
 
   return response.json();
+}
+
+export async function readPapeleraTasks(): Promise<Map<string, Tarea>> {
+  const tasks = new Map<string, Tarea>();
+  const url = isDevelopment ? '/papelera/' : PAPELERA_DIR;
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const html = await response.text();
+
+    const fileRegex = /href="(202\d{11}\.json)"/g;
+    let match;
+    const filenames: string[] = [];
+
+    while ((match = fileRegex.exec(html)) !== null) {
+      filenames.push(match[1]);
+    }
+
+    const fileContents = await Promise.all(
+      filenames.map(async (filename) => {
+        try {
+          const fileUrl = isDevelopment ? `/papelera/${filename}` : `${PAPELERA_DIR}/${filename}`;
+          const fileResponse = await fetch(fileUrl);
+          if (fileResponse.ok) {
+            return { filename, task: await fileResponse.json() as Tarea };
+          }
+        } catch (e) {
+          console.warn(`Error reading papelera file ${filename}:`, e);
+        }
+        return null;
+      })
+    );
+
+    fileContents.forEach((result) => {
+      if (result) {
+        tasks.set(result.filename, result.task);
+      }
+    });
+  } catch (e) {
+    console.error('Error reading papelera directory:', e);
+    throw e;
+  }
+
+  return tasks;
+}
+
+export async function restoreTask(filename: string): Promise<void> {
+  const url = isDevelopment ? `/papelera/${filename}/restore` : `${PAPELERA_DIR}/${filename}/restore`;
+  const response = await fetch(url, { method: 'POST' });
+
+  if (!response.ok) {
+    throw new Error(`Failed to restore ${filename}: HTTP ${response.status}`);
+  }
 }
 
 export async function createClasificadaTask(input: ClasificadaTaskInput): Promise<{ filename: string }> {

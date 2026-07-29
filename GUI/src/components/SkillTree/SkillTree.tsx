@@ -19,7 +19,7 @@ interface NodePosition {
 }
 
 const NODE_W = 260;
-const NODE_H = 80;
+const NODE_H = 120;
 const COL_GAP = 60;
 const ROW_GAP = 20;
 
@@ -83,6 +83,7 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, zoom }: Skil
   useEffect(() => {
     const newPositions = new Map(nodePositions);
     let changed = false;
+
     nodePositions.forEach((pos, id) => {
       const el = document.getElementById(`node-${id}`);
       if (!el) return;
@@ -94,10 +95,26 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, zoom }: Skil
         changed = true;
       }
     });
+
+    projects.forEach((tareas) => {
+      let rowY: number | null = null;
+      tareas.forEach((tarea) => {
+        const pos = newPositions.get(tarea.id);
+        if (!pos) return;
+        if (rowY === null) {
+          rowY = pos.y;
+        } else {
+          if (pos.y !== rowY) changed = true;
+          newPositions.set(tarea.id, { ...pos, y: rowY });
+        }
+        rowY! += pos.height + ROW_GAP;
+      });
+    });
+
     if (changed) {
       setNodePositions(newPositions);
     }
-  }, [zoom]);
+  }, [zoom, projects, nodePositions]);
 
   const projectsArray = useMemo(() => Array.from(projects.entries()), [projects]);
 

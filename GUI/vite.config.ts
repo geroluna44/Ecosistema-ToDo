@@ -12,6 +12,10 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/tareas/, ''),
       },
+      '/papelera': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 });

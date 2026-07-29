@@ -4,10 +4,14 @@ import { SkillTree } from './components/SkillTree/SkillTree';
 import { ZoomControls } from './components/ZoomControls';
 import { QuickAddFAB } from './components/QuickAddFAB';
 import { EditTaskForm } from './components/EditTaskForm';
+import { HamburgerMenu } from './components/HamburgerMenu';
+import { PapeleraView } from './components/PapeleraView';
 import { Tarea, Vista } from './types/task';
 import { useState, useMemo, useCallback, useRef } from 'react';
 import './styles/zoom-controls.css';
 import './styles/quick-add-fab.css';
+import './styles/hamburger-menu.css';
+import './styles/papelera-view.css';
 
 function clamp(val: number, min: number, max: number) {
   return Math.min(Math.max(val, min), max);
@@ -62,6 +66,16 @@ function App() {
     setOffsetY(0);
   };
 
+  const panBy = (dx: number, dy: number) => {
+    setOffsetX(x => x + dx);
+    setOffsetY(y => y + dy);
+  };
+
+  const panHome = () => {
+    setOffsetX(0);
+    setOffsetY(0);
+  };
+
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.90 : 1.10;
@@ -108,16 +122,25 @@ function App() {
     setIsPanning(false);
   }, []);
 
+  const handleSelectPapelera = useCallback(() => {
+    setVistaActiva('papelera');
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">Ecosistema ToDo</h1>
+        <HamburgerMenu onSelectPapelera={handleSelectPapelera} />
       </header>
       
       <main className="app-main">
-        <ViewSelector vistaActiva={vistaActiva} onVistaChange={setVistaActiva} />
-        <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onZoomReset={zoomReset} />
-        <QuickAddFAB />
+        {vistaActiva !== 'papelera' && (
+          <>
+            <ViewSelector vistaActiva={vistaActiva} onVistaChange={setVistaActiva} />
+            <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onZoomReset={zoomReset} onPanBy={panBy} onPanHome={panHome} />
+            <QuickAddFAB />
+          </>
+        )}
         
         {loading && <div className="loading">Cargando tareas...</div>}
         
@@ -163,6 +186,10 @@ function App() {
         
         {!loading && !error && vistaActiva === 'nodos' && (
           <div className="loading">Vista de nodos (próximamente)</div>
+        )}
+
+        {vistaActiva === 'papelera' && (
+          <PapeleraView onBack={() => setVistaActiva('arbol')} />
         )}
       </main>
 

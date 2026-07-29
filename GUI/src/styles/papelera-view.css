@@ -1,0 +1,139 @@
+.papelera-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-main);
+  z-index: 50;
+}
+
+.papelera-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--bg-hover);
+  flex-shrink: 0;
+}
+
+.papelera-back-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background-color: var(--bg-card);
+  border: 1px solid var(--bg-hover);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.papelera-back-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.papelera-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-heading);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.papelera-loading,
+.papelera-error,
+.papelera-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.papelera-error {
+  color: var(--state-blocked);
+}
+
+.papelera-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.papelera-item {
+  padding: 12px 16px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--bg-hover);
+  border-radius: 8px;
+}
+
+.papelera-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.papelera-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.papelera-item-urgency {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.papelera-item-urgency.urgency-a {
+  background-color: var(--state-blocked);
+  color: var(--text-heading);
+}
+
+.papelera-item-urgency.urgency-b {
+  background-color: var(--state-postponed);
+  color: var(--bg-main);
+}
+
+.papelera-item-urgency.urgency-c {
+  background-color: var(--state-available);
+  color: var(--bg-main);
+}
+
+.papelera-item-project {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.papelera-item-desc {
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.papelera-restore-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--state-available);
+  background-color: transparent;
+  border: 1px solid var(--state-available);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.papelera-restore-btn:hover {
+  background-color: var(--state-available);
+  color: var(--bg-main);
+}

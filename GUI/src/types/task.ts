@@ -22,7 +22,7 @@ export interface TareaRelacionada extends Tarea {
   tieneHijosPendientes: boolean;
 }
 
-export type Vista = 'arbol' | 'calendario' | 'nodos';
+export type Vista = 'arbol' | 'calendario' | 'nodos' | 'papelera';
 
 export interface PosicionNodo {
   id: string;

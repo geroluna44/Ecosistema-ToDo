@@ -8,11 +8,68 @@ from urllib.parse import unquote
 
 TASKS_DIR = os.path.expanduser("~/tareas/clasificadas")
 POOL_DIR = os.path.expanduser("~/tareas/pool")
+PAPELERA_DIR = os.path.expanduser("~/tareas/papelera")
 PORT = 8080
 
 class TasksHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=TASKS_DIR, **kwargs)
+
+    def do_GET(self):
+        path = unquote(self.path)
+
+        if path.startswith("/papelera/"):
+            relative = path[len("/papelera/"):]
+            self.handle_papelera_get(relative)
+        else:
+            super().do_GET()
+
+    def handle_papelera_get(self, relative):
+        import urllib.parse
+        from http.server import SimpleHTTPRequestHandler
+
+        if not relative or relative == "/":
+            self.list_directory_html(PAPELERA_DIR)
+            return
+
+        filename = urllib.parse.unquote(relative)
+        filepath = os.path.join(PAPELERA_DIR, filename)
+
+        if not os.path.realpath(filepath).startswith(os.path.realpath(PAPELERA_DIR)):
+            self.send_error(403, "Forbidden")
+            return
+
+        if not os.path.isfile(filepath):
+            self.send_error(404, "Not found")
+            return
+
+        try:
+            with open(filepath, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def list_directory_html(self, directory):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.end_headers()
+
+        try:
+            entries = sorted(
+                f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))
+            )
+        except OSError:
+            entries = []
+
+        self.wfile.write(b"<!DOCTYPE html>\n<html>\n<body>\n")
+        for name in entries:
+            encoded = name.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+            self.wfile.write(f'<a href="{encoded}">{encoded}</a><br>\n'.encode("utf-8"))
+        self.wfile.write(b"</body>\n</html>\n")
 
     def do_PUT(self):
         filepath = unquote(self.path.strip("/"))
@@ -44,8 +101,33 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
 
         if path == "pool" or path.startswith("pool/"):
             self.handle_create_pool_task(path)
+        elif path.startswith("papelera/") and path.endswith("/restore"):
+            self.handle_restore_task(path)
         else:
             self.handle_create_clasificada_task(path)
+
+    def handle_restore_task(self, path):
+        try:
+            filename = path[len("papelera/"):-len("/restore")]
+            src = os.path.join(PAPELERA_DIR, filename)
+
+            if not os.path.realpath(src).startswith(os.path.realpath(PAPELERA_DIR)):
+                self.send_error(403, "Forbidden")
+                return
+
+            if not os.path.isfile(src):
+                self.send_error(404, "File not found in papelera")
+                return
+
+            dst = os.path.join(TASKS_DIR, filename)
+            os.rename(src, dst)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+        except Exception as e:
+            self.send_error(500, str(e))
 
     def handle_create_pool_task(self, path):
         os.makedirs(POOL_DIR, exist_ok=True)
@@ -143,10 +225,12 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     print(f"Serving {TASKS_DIR}")
     print(f"Serving pool at {POOL_DIR}")
+    print(f"Serving papelera at {PAPELERA_DIR}")
     print(f"http://localhost:{PORT}/")
     print("Press Ctrl+C to stop")
 
     os.makedirs(POOL_DIR, exist_ok=True)
+    os.makedirs(PAPELERA_DIR, exist_ok=True)
 
     with socketserver.TCPServer(("", PORT), TasksHandler) as httpd:
         httpd.serve_forever()
