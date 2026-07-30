@@ -283,3 +283,14 @@
   background-color: var(--state-blocked);
   color: var(--text-heading);
 }
+
+.sticky-info-btn.connect-btn {
+  border-color: var(--connection);
+  color: var(--connection);
+  font-weight: 500;
+}
+
+.sticky-info-btn.connect-btn:hover {
+  background-color: var(--connection);
+  color: var(--text-heading);
+}

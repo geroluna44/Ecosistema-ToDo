@@ -113,6 +113,13 @@ export interface ClasificadaTaskInput {
   tarea_hija: string;
 }
 
+export async function updateConnection(filename: string, parentFilename: string, tasks: Map<string, Tarea>): Promise<void> {
+  const task = tasks.get(filename);
+  if (!task) throw new Error(`Task ${filename} not found`);
+  const updated: Tarea = { ...task, 'Tarea Padre': parentFilename };
+  await writeTask(filename, updated);
+}
+
 export async function createPoolTask(input: PoolTaskInput): Promise<{ filename: string }> {
   const response = await fetch(serverConfig.postPoolUrl, {
     method: 'POST',

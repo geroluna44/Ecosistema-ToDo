@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { TareaRelacionada } from '../../types/task';
 import { SkillNode } from './SkillNode';
+import { ConnectorOverlay } from './ConnectorOverlay';
 import './skill-tree.css';
 
 interface SkillTreeProps {
@@ -9,6 +10,7 @@ interface SkillTreeProps {
   onEditTask: (filename: string) => void;
   onTrashTask: (filename: string) => void;
   onTrashProject: (proyecto: string) => void;
+  onConnect?: (parentId: string, childId: string) => void;
   zoom: number;
   layoutVersion: number;
 }
@@ -51,12 +53,13 @@ function computeLayout(
   return positions;
 }
 
-export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, zoom, layoutVersion }: SkillTreeProps) {
+export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, onConnect, zoom, layoutVersion }: SkillTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null);
   const wasDraggedRef = useRef(false);
   const zoomRef = useRef(zoom);
   const [stickyNodeId, setStickyNodeId] = useState<string | null>(null);
+  const [editModeNodeId, setEditModeNodeId] = useState<string | null>(null);
   zoomRef.current = zoom;
 
   const tasksMap = useMemo(() => {
@@ -92,8 +95,8 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
       const el = document.getElementById(`node-${id}`);
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      const actualW = rect.width / zoom;
-      const actualH = rect.height / zoom;
+      const actualW = rect.width / zoomRef.current;
+      const actualH = rect.height / zoomRef.current;
       if (Math.abs(actualW - pos.width) > 3 || Math.abs(actualH - pos.height) > 3) {
         newPositions.set(id, { ...pos, width: actualW, height: actualH });
         changed = true;
@@ -103,13 +106,27 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
     if (changed) {
       setNodePositions(newPositions);
     }
-  }, [zoom, projects, nodePositions]);
+  }, [projects, nodePositions]);
 
   useEffect(() => {
     setNodePositions(computeLayout(projects, tasksMap));
   }, [layoutVersion, projects, tasksMap]);
 
   const projectsArray = useMemo(() => Array.from(projects.entries()), [projects]);
+
+  const contentBounds = useMemo(() => {
+    let maxX = 0, maxY = 0;
+    nodePositions.forEach(p => {
+      maxX = Math.max(maxX, p.x + p.width);
+      maxY = Math.max(maxY, p.y + p.height);
+    });
+    return { width: Math.max(maxX + 40, 100), height: Math.max(maxY + 40, 100) };
+  }, [nodePositions]);
+
+  const handleModifyConnections = useCallback((id: string) => {
+    setStickyNodeId(null);
+    setEditModeNodeId(prev => prev === id ? null : id);
+  }, []);
 
   const handleNodeMouseDown = useCallback((e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
@@ -158,7 +175,7 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
 
   return (
     <div className="skill-tree" ref={containerRef}>
-      <div className="skill-tree-content">
+      <div className="skill-tree-content" style={{ width: contentBounds.width, height: contentBounds.height }}>
 
         {projectsArray.map(([proyecto, tareas]) => (
           <div key={proyecto}>
@@ -187,6 +204,7 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
                     onTrashProject={onTrashProject}
                     isStickyOpen={stickyNodeId === tarea.id}
                     onToggleSticky={(id) => setStickyNodeId(prev => prev === id ? null : id)}
+                    onModifyConnections={handleModifyConnections}
                     wasDraggedRef={wasDraggedRef}
                   />
                 </div>
@@ -194,6 +212,7 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
             })}
           </div>
         ))}
+        <ConnectorOverlay nodePositions={nodePositions} tasksMap={tasksMap} onConnect={onConnect} ghostNodeId={editModeNodeId} />
       </div>
     </div>
   );

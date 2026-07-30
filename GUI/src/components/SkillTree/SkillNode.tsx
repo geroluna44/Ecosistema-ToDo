@@ -11,6 +11,7 @@ interface SkillNodeProps {
   onTrashProject: (proyecto: string) => void;
   isStickyOpen: boolean;
   onToggleSticky: (id: string) => void;
+  onModifyConnections?: (id: string) => void;
   wasDraggedRef?: RefObject<boolean>;
 }
 
@@ -30,7 +31,7 @@ function formatTime(minutes: number | undefined): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, onTrashProject, isStickyOpen, onToggleSticky, wasDraggedRef }: SkillNodeProps) {
+export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, onTrashProject, isStickyOpen, onToggleSticky, onModifyConnections, wasDraggedRef }: SkillNodeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
 
@@ -186,10 +187,15 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, 
             <button className="sticky-info-btn edit-btn" onClick={handleStickyClick}>
               ✏️ Editar
             </button>
-            <button className="sticky-info-btn trash-btn" onClick={handleTrash}>
-              🗑️ Papelera
+          <button className="sticky-info-btn trash-btn" onClick={handleTrash}>
+            🗑️ Papelera
+          </button>
+          {onModifyConnections && (
+            <button className="sticky-info-btn connect-btn" onClick={() => onModifyConnections(tarea.id)}>
+              🔗 Modificar conexiones
             </button>
-            {tarea.esRaiz && tarea.Proyecto && (
+          )}
+          {tarea.esRaiz && tarea.Proyecto && (
               <button className="sticky-info-btn trash-project-btn" onClick={handleTrashProject}>
                 🗑️ Borrar proyecto
               </button>

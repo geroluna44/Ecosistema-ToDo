@@ -8,7 +8,7 @@ import { HamburgerMenu } from './components/HamburgerMenu';
 import { PapeleraView } from './components/PapeleraView';
 import { Tarea, Vista } from './types/task';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { deleteTask, trashProject, emptyTrash } from './services/taskService';
+import { deleteTask, trashProject, emptyTrash, updateConnection } from './services/taskService';
 import './styles/zoom-controls.css';
 import './styles/quick-add-fab.css';
 import './styles/hamburger-menu.css';
@@ -29,6 +29,7 @@ function App() {
   const [isPanning, setIsPanning] = useState(false);
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [sortOpen, setSortOpen] = useState(false);
+  const [connectionMode, setConnectionMode] = useState('proyecto');
   const sortRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const panStart = useRef({ x: 0, y: 0 });
@@ -68,6 +69,15 @@ function App() {
       console.error('Error trashing project:', e);
     }
   }, [reload]);
+
+  const handleConnect = useCallback(async (parentId: string, childId: string) => {
+    try {
+      await updateConnection(childId, parentId, tasks);
+      reload();
+    } catch (e) {
+      console.error('Error updating connection:', e);
+    }
+  }, [tasks, reload]);
 
   const handleEmptyTrash = useCallback(async () => {
     try {
@@ -158,6 +168,7 @@ function App() {
   }, []);
 
   const handleSort = useCallback((criterion: string) => {
+    setConnectionMode(criterion);
     if (criterion === 'proyecto') {
       setLayoutVersion(v => v + 1);
     }
@@ -216,10 +227,12 @@ function App() {
                 onEditTask={handleEditTask}
                 onTrashTask={handleTrashTask}
                 onTrashProject={handleTrashProject}
+                onConnect={handleConnect}
                 zoom={zoom}
                 layoutVersion={layoutVersion}
               />
             </div>
+            <div className="connection-indicator">Conectado según {connectionMode}</div>
             <div className="layout-selector" ref={sortRef}>
               <button className="sort-btn" onClick={() => setSortOpen(o => !o)}>
                 Ordenar ▾
