@@ -8,7 +8,7 @@ import { HamburgerMenu } from './components/HamburgerMenu';
 import { PapeleraView } from './components/PapeleraView';
 import { Tarea, Vista } from './types/task';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { deleteTask, trashProject, emptyTrash, updateConnection } from './services/taskService';
+import { deleteTask, trashProject, emptyTrash, updateConnection, removeConnection } from './services/taskService';
 import './styles/zoom-controls.css';
 import './styles/quick-add-fab.css';
 import './styles/hamburger-menu.css';
@@ -30,6 +30,7 @@ function App() {
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [sortOpen, setSortOpen] = useState(false);
   const [connectionMode, setConnectionMode] = useState('proyecto');
+  const [modifyingNodeId, setModifyingNodeId] = useState<string | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const panStart = useRef({ x: 0, y: 0 });
@@ -76,6 +77,15 @@ function App() {
       reload();
     } catch (e) {
       console.error('Error updating connection:', e);
+    }
+  }, [tasks, reload]);
+
+  const handleDisconnect = useCallback(async (childId: string) => {
+    try {
+      await removeConnection(childId, tasks);
+      reload();
+    } catch (e) {
+      console.error('Error removing connection:', e);
     }
   }, [tasks, reload]);
 
@@ -143,13 +153,18 @@ function App() {
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target.closest('.skill-node-wrapper, .zoom-controls, .view-selector, .quick-add-fab')) return;
+    if (target.closest('.skill-node-wrapper, .zoom-controls, .view-selector, .quick-add-fab, .connector-shape, .sticky-info-card')) return;
+
+    if (modifyingNodeId !== null) {
+      setModifyingNodeId(null);
+      return;
+    }
 
     e.preventDefault();
     setIsPanning(true);
     dragStart.current = { x: e.clientX, y: e.clientY };
     panStart.current = { x: offsetX, y: offsetY };
-  }, [offsetX, offsetY]);
+  }, [offsetX, offsetY, modifyingNodeId]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanning) return;
@@ -166,6 +181,14 @@ function App() {
   const handleSelectPapelera = useCallback(() => {
     setVistaActiva('papelera');
   }, []);
+
+  const handleModifyConnectionsChange = useCallback((nodeId: string | null) => {
+    setModifyingNodeId(nodeId);
+  }, []);
+
+  const indicatorText = modifyingNodeId !== null
+    ? 'Modificando conexiones'
+    : `Conectado según ${connectionMode}`;
 
   const handleSort = useCallback((criterion: string) => {
     setConnectionMode(criterion);
@@ -185,6 +208,17 @@ function App() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [sortOpen]);
+
+  useEffect(() => {
+    if (modifyingNodeId === null) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setModifyingNodeId(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [modifyingNodeId]);
 
   return (
     <div className="app">
@@ -228,11 +262,14 @@ function App() {
                 onTrashTask={handleTrashTask}
                 onTrashProject={handleTrashProject}
                 onConnect={handleConnect}
+                onDisconnect={handleDisconnect}
                 zoom={zoom}
                 layoutVersion={layoutVersion}
+                modifyingNodeId={modifyingNodeId}
+                onModifyConnectionsChange={handleModifyConnectionsChange}
               />
             </div>
-            <div className="connection-indicator">Conectado según {connectionMode}</div>
+            <div className="connection-indicator">{indicatorText}</div>
             <div className="layout-selector" ref={sortRef}>
               <button className="sort-btn" onClick={() => setSortOpen(o => !o)}>
                 Ordenar ▾

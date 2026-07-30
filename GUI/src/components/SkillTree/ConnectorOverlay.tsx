@@ -13,7 +13,9 @@ interface ConnectorOverlayProps {
   nodePositions: Map<string, NodePosition>;
   tasksMap: Map<string, TareaRelacionada>;
   onConnect?: (parentId: string, childId: string) => void;
+  onDisconnect?: (childId: string) => void;
   ghostNodeId?: string | null;
+  onModifyConnectionsClick: (nodeId: string) => void;
 }
 
 type Edge = 'top' | 'right' | 'bottom' | 'left';
@@ -92,7 +94,7 @@ function computeOrthogonalPath(
   return `M ${sx},${sy} L ${startX},${startY} L ${midX},${startY} L ${midX},${endY} L ${endX},${endY} L ${ex},${ey}`;
 }
 
-export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNodeId }: ConnectorOverlayProps) {
+export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconnect, ghostNodeId, onModifyConnectionsClick }: ConnectorOverlayProps) {
   const [dragState, setDragState] = useState<{
     sourceNodeId: string;
     cx: number;
@@ -105,6 +107,20 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNode
 
   const dragStateRef = useRef<typeof dragState>(null);
   dragStateRef.current = dragState;
+
+  const [disconnectDrag, setDisconnectDrag] = useState<{
+    sourceNodeId: string;
+    cx: number;
+    cy: number;
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    moved: boolean;
+  } | null>(null);
+
+  const disconnectDragRef = useRef<typeof disconnectDrag>(null);
+  disconnectDragRef.current = disconnectDrag;
 
   const { connectors, lines } = useMemo(() => {
     const connectors: Connector[] = [];
@@ -225,6 +241,27 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNode
     return { connectors, lines };
   }, [nodePositions, tasksMap]);
 
+  const handleInputPointerDown = useCallback((e: React.PointerEvent, conn: Connector) => {
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+
+    setDisconnectDrag({
+      sourceNodeId: conn.nodeId,
+      cx: conn.cx,
+      cy: conn.cy,
+      startX: e.clientX,
+      startY: e.clientY,
+      currentX: conn.cx,
+      currentY: conn.cy,
+      moved: false,
+    });
+  }, []);
+
+  const handleOutputPointerDown = useCallback((e: React.PointerEvent, conn: Connector) => {
+    e.stopPropagation();
+    onModifyConnectionsClick(conn.nodeId);
+  }, [onModifyConnectionsClick]);
+
   const handlePointerDown = useCallback((e: React.PointerEvent, conn: Connector) => {
     if (!onConnect) return;
     e.stopPropagation();
@@ -242,12 +279,22 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNode
   }, [onConnect]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragStateRef.current) return;
     const svg = (e.target as Element).closest('svg');
     if (!svg) return;
     const rect = svg.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+
+    if (disconnectDragRef.current) {
+      const d = disconnectDragRef.current;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      const moved = d.moved || Math.abs(dx) > 5 || Math.abs(dy) > 5;
+      setDisconnectDrag(prev => prev ? { ...prev, currentX: x, currentY: y, moved } : null);
+      return;
+    }
+
+    if (!dragStateRef.current) return;
 
     let targetNodeId: string | null = null;
     nodePositions.forEach((pos, nodeId) => {
@@ -265,19 +312,34 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNode
   }, [nodePositions]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    if (!dragStateRef.current || !onConnect) return;
     (e.target as Element).releasePointerCapture?.(e.pointerId);
+
+    if (disconnectDragRef.current) {
+      const d = disconnectDragRef.current;
+      if (d.moved && onDisconnect) {
+        onDisconnect(d.sourceNodeId);
+      } else {
+        onModifyConnectionsClick(d.sourceNodeId);
+      }
+      setDisconnectDrag(null);
+      return;
+    }
+
+    if (!dragStateRef.current || !onConnect) return;
 
     const state = dragStateRef.current;
     if (state.targetNodeId) {
       onConnect(state.sourceNodeId, state.targetNodeId);
     }
     setDragState(null);
-  }, [onConnect]);
+  }, [onConnect, onDisconnect, onModifyConnectionsClick]);
 
   const handlePointerLeave = useCallback(() => {
     if (dragStateRef.current) {
       setDragState(null);
+    }
+    if (disconnectDragRef.current) {
+      setDisconnectDrag(null);
     }
   }, []);
 
@@ -353,6 +415,13 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNode
         <path className="connection-line preview" d={previewLine} />
       )}
 
+      {disconnectDrag && disconnectDrag.moved && (
+        <path
+          className="connection-line disconnect"
+          d={`M ${disconnectDrag.cx},${disconnectDrag.cy} L ${disconnectDrag.currentX},${disconnectDrag.currentY}`}
+        />
+      )}
+
       {connectors.map((conn) => {
         const shape = conn.type === 'input' ? (
           <circle
@@ -360,13 +429,13 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, ghostNode
             cx={conn.cx}
             cy={conn.cy}
             r={7}
-            onPointerDown={(e) => handlePointerDown(e, conn)}
+            onPointerDown={(e) => handleInputPointerDown(e, conn)}
           />
         ) : (
           <polygon
             className={`connector-shape ${conn.status}`}
             points={getTrianglePoints(conn.cx, conn.cy, conn.edge)}
-            onPointerDown={(e) => handlePointerDown(e, conn)}
+            onPointerDown={(e) => handleOutputPointerDown(e, conn)}
           />
         );
         return shape;

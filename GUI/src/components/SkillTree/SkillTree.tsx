@@ -11,8 +11,11 @@ interface SkillTreeProps {
   onTrashTask: (filename: string) => void;
   onTrashProject: (proyecto: string) => void;
   onConnect?: (parentId: string, childId: string) => void;
+  onDisconnect?: (childId: string) => void;
   zoom: number;
   layoutVersion: number;
+  modifyingNodeId: string | null;
+  onModifyConnectionsChange: (nodeId: string | null) => void;
 }
 
 interface NodePosition {
@@ -53,13 +56,12 @@ function computeLayout(
   return positions;
 }
 
-export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, onConnect, zoom, layoutVersion }: SkillTreeProps) {
+export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, onConnect, onDisconnect, zoom, layoutVersion, modifyingNodeId, onModifyConnectionsChange }: SkillTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null);
   const wasDraggedRef = useRef(false);
   const zoomRef = useRef(zoom);
   const [stickyNodeId, setStickyNodeId] = useState<string | null>(null);
-  const [editModeNodeId, setEditModeNodeId] = useState<string | null>(null);
   zoomRef.current = zoom;
 
   const tasksMap = useMemo(() => {
@@ -125,8 +127,8 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
 
   const handleModifyConnections = useCallback((id: string) => {
     setStickyNodeId(null);
-    setEditModeNodeId(prev => prev === id ? null : id);
-  }, []);
+    onModifyConnectionsChange(modifyingNodeId === id ? null : id);
+  }, [modifyingNodeId, onModifyConnectionsChange]);
 
   const handleNodeMouseDown = useCallback((e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();
@@ -212,7 +214,7 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
             })}
           </div>
         ))}
-        <ConnectorOverlay nodePositions={nodePositions} tasksMap={tasksMap} onConnect={onConnect} ghostNodeId={editModeNodeId} />
+        <ConnectorOverlay nodePositions={nodePositions} tasksMap={tasksMap} onConnect={onConnect} onDisconnect={onDisconnect} ghostNodeId={modifyingNodeId} onModifyConnectionsClick={onModifyConnectionsChange} />
       </div>
     </div>
   );
