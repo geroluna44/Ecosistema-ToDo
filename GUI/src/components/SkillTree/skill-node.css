@@ -240,3 +240,46 @@
   background-color: var(--state-available);
   color: var(--bg-main);
 }
+
+.sticky-info-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bg-hover);
+}
+
+.sticky-info-btn {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid var(--connection);
+  border-radius: 4px;
+  background: var(--bg-main);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sticky-info-btn:hover {
+  background: var(--bg-hover);
+}
+
+.sticky-info-btn.edit-btn:hover {
+  border-color: var(--state-available);
+}
+
+.sticky-info-btn.trash-btn:hover {
+  border-color: var(--state-blocked);
+}
+
+.sticky-info-btn.trash-project-btn {
+  border-color: var(--state-blocked);
+  color: var(--state-blocked);
+  font-weight: 600;
+}
+
+.sticky-info-btn.trash-project-btn:hover {
+  background-color: var(--state-blocked);
+  color: var(--text-heading);
+}

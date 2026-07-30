@@ -7,7 +7,8 @@ import { EditTaskForm } from './components/EditTaskForm';
 import { HamburgerMenu } from './components/HamburgerMenu';
 import { PapeleraView } from './components/PapeleraView';
 import { Tarea, Vista } from './types/task';
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { deleteTask, trashProject, emptyTrash } from './services/taskService';
 import './styles/zoom-controls.css';
 import './styles/quick-add-fab.css';
 import './styles/hamburger-menu.css';
@@ -26,7 +27,9 @@ function App() {
   const [editingFilename, setEditingFilename] = useState<string | null>(null);
 
   const [isPanning, setIsPanning] = useState(false);
-  const [layout, setLayout] = useState('proyecto');
+  const [layoutVersion, setLayoutVersion] = useState(0);
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const panStart = useRef({ x: 0, y: 0 });
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -46,6 +49,34 @@ function App() {
   const handleEditTask = useCallback((filename: string) => {
     setEditingFilename(filename);
   }, []);
+
+  const handleTrashTask = useCallback(async (filename: string) => {
+    try {
+      await deleteTask(filename);
+      reload();
+    } catch (e) {
+      console.error('Error moving task to trash:', e);
+    }
+  }, [reload]);
+
+  const handleTrashProject = useCallback(async (proyecto: string) => {
+    if (!confirm(`¿Mover todo el proyecto "${proyecto}" a la papelera?`)) return;
+    try {
+      await trashProject(proyecto);
+      reload();
+    } catch (e) {
+      console.error('Error trashing project:', e);
+    }
+  }, [reload]);
+
+  const handleEmptyTrash = useCallback(async () => {
+    try {
+      await emptyTrash();
+      reload();
+    } catch (e) {
+      console.error('Error emptying trash:', e);
+    }
+  }, [reload]);
 
   const handleCloseEdit = useCallback(() => {
     setEditingFilename(null);
@@ -126,6 +157,24 @@ function App() {
     setVistaActiva('papelera');
   }, []);
 
+  const handleSort = useCallback((criterion: string) => {
+    if (criterion === 'proyecto') {
+      setLayoutVersion(v => v + 1);
+    }
+    setSortOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!sortOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+        setSortOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [sortOpen]);
+
   return (
     <div className="app">
       <header className="app-header">
@@ -165,17 +214,23 @@ function App() {
                 projects={skillTreeData}
                 onToggleComplete={handleToggleComplete}
                 onEditTask={handleEditTask}
+                onTrashTask={handleTrashTask}
+                onTrashProject={handleTrashProject}
                 zoom={zoom}
+                layoutVersion={layoutVersion}
               />
             </div>
-            <div className="layout-selector">
-              <select
-                value={layout}
-                onChange={(e) => setLayout(e.target.value)}
-                className="layout-selector-select"
-              >
-                <option value="proyecto">Por proyecto</option>
-              </select>
+            <div className="layout-selector" ref={sortRef}>
+              <button className="sort-btn" onClick={() => setSortOpen(o => !o)}>
+                Ordenar ▾
+              </button>
+              {sortOpen && (
+                <ul className="sort-menu">
+                  <li className="sort-option" onClick={() => handleSort('proyecto')}>
+                    Por proyecto
+                  </li>
+                </ul>
+              )}
             </div>
           </div>
         )}
@@ -189,7 +244,7 @@ function App() {
         )}
 
         {vistaActiva === 'papelera' && (
-          <PapeleraView onBack={() => setVistaActiva('arbol')} />
+          <PapeleraView onBack={() => setVistaActiva('arbol')} onEmptyTrash={handleEmptyTrash} />
         )}
       </main>
 

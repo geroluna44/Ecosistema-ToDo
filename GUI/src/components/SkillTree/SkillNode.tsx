@@ -7,6 +7,10 @@ interface SkillNodeProps {
   tasksMap: Map<string, TareaRelacionada>;
   onToggleComplete: (filename: string) => void;
   onEdit: (filename: string) => void;
+  onTrash: (filename: string) => void;
+  onTrashProject: (proyecto: string) => void;
+  isStickyOpen: boolean;
+  onToggleSticky: (id: string) => void;
   wasDraggedRef?: RefObject<boolean>;
 }
 
@@ -26,9 +30,8 @@ function formatTime(minutes: number | undefined): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDraggedRef }: SkillNodeProps) {
+export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, onTrashProject, isStickyOpen, onToggleSticky, wasDraggedRef }: SkillNodeProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [stickyInfo, setStickyInfo] = useState(false);
   const stickyRef = useRef<HTMLDivElement>(null);
 
   const { isBlocked, isPosterged, status } = useMemo(() => {
@@ -45,16 +48,16 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
   }, [tarea, tasksMap]);
 
   useEffect(() => {
-    if (!stickyInfo) return;
+    if (!isStickyOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
       if (stickyRef.current && !stickyRef.current.contains(e.target as Node)) {
-        setStickyInfo(false);
+        onToggleSticky(tarea.id);
       }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setStickyInfo(false);
+      if (e.key === 'Escape') onToggleSticky(tarea.id);
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -63,7 +66,7 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [stickyInfo]);
+  }, [isStickyOpen, onToggleSticky, tarea.id]);
 
   const handleClick = () => {
     if (wasDraggedRef?.current) return;
@@ -74,7 +77,7 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    setStickyInfo(prev => !prev);
+    onToggleSticky(tarea.id);
   };
 
   const handleMouseEnter = () => {
@@ -87,7 +90,23 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
 
   const handleStickyClick = () => {
     onEdit(tarea.id);
-    setStickyInfo(false);
+    onToggleSticky(tarea.id);
+  };
+
+  const handleTrash = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`¿Mover "${tarea.Nombre}" a la papelera?`)) {
+      onTrash(tarea.id);
+    }
+    onToggleSticky(tarea.id);
+  };
+
+  const handleTrashProject = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (confirm(`¿Mover todo el proyecto "${tarea.Proyecto}" a la papelera?`)) {
+      onTrashProject(tarea.Proyecto);
+    }
+    onToggleSticky(tarea.id);
   };
 
   const nodeClasses = useMemo(() => [
@@ -127,7 +146,7 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
         </div>
       </div>
 
-      {showTooltip && (
+      {showTooltip && !isStickyOpen && (
         <div className="tooltip">
           <div className="tooltip-title">{tarea.Nombre}</div>
           <div className="tooltip-project">{tarea.Proyecto}</div>
@@ -145,11 +164,10 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
         </div>
       )}
 
-      {stickyInfo && (
+      {isStickyOpen && (
         <div
           ref={stickyRef}
           className="sticky-info-card"
-          onClick={handleStickyClick}
         >
           <div className="sticky-info-title">{tarea.Nombre}</div>
           <div className="sticky-info-project">{tarea.Proyecto}</div>
@@ -162,6 +180,19 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, wasDragge
             </span>
             {tarea['Primer paso'] && (
               <span className="sticky-info-badge">→ {tarea['Primer paso']}</span>
+            )}
+          </div>
+          <div className="sticky-info-actions">
+            <button className="sticky-info-btn edit-btn" onClick={handleStickyClick}>
+              ✏️ Editar
+            </button>
+            <button className="sticky-info-btn trash-btn" onClick={handleTrash}>
+              🗑️ Papelera
+            </button>
+            {tarea.esRaiz && tarea.Proyecto && (
+              <button className="sticky-info-btn trash-project-btn" onClick={handleTrashProject}>
+                🗑️ Borrar proyecto
+              </button>
             )}
           </div>
         </div>

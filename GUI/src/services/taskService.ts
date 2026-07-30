@@ -185,6 +185,18 @@ export async function restoreTask(filename: string): Promise<void> {
   }
 }
 
+export async function restoreProject(proyecto: string): Promise<void> {
+  if (isDevelopment) {
+    const response = await fetch(`/papelera/restore/project?proyecto=${encodeURIComponent(proyecto)}`, { method: 'POST' });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Failed to restore project: ${err}`);
+    }
+  } else {
+    throw new Error('restoreProject not supported in production mode');
+  }
+}
+
 export async function createClasificadaTask(input: ClasificadaTaskInput): Promise<{ filename: string }> {
   const response = await fetch(serverConfig.postTaskUrl, {
     method: 'POST',
@@ -199,4 +211,40 @@ export async function createClasificadaTask(input: ClasificadaTaskInput): Promis
   }
 
   return response.json();
+}
+
+export async function deleteTask(filename: string): Promise<void> {
+  if (isDevelopment) {
+    const response = await fetch(`/tareas/${filename}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Failed to delete ${filename}: ${err}`);
+    }
+  } else {
+    throw new Error('deleteTask not supported in production mode');
+  }
+}
+
+export async function trashProject(proyecto: string): Promise<void> {
+  if (isDevelopment) {
+    const response = await fetch(`/tareas/?proyecto=${encodeURIComponent(proyecto)}`, { method: 'DELETE' });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Failed to trash project: ${err}`);
+    }
+  } else {
+    throw new Error('trashProject not supported in production mode');
+  }
+}
+
+export async function emptyTrash(): Promise<void> {
+  if (isDevelopment) {
+    const response = await fetch('/papelera/', { method: 'DELETE' });
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Failed to empty trash: ${err}`);
+    }
+  } else {
+    throw new Error('emptyTrash not supported in production mode');
+  }
 }

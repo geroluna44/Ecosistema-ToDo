@@ -4,12 +4,17 @@ import socketserver
 import os
 import json
 import re
-from urllib.parse import unquote
+import subprocess
+import sys
+from urllib.parse import unquote, urlparse, parse_qs
 
 TASKS_DIR = os.path.expanduser("~/tareas/clasificadas")
 POOL_DIR = os.path.expanduser("~/tareas/pool")
 PAPELERA_DIR = os.path.expanduser("~/tareas/papelera")
 PORT = 8080
+
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+TRASHTAREA = os.path.join(THIS_DIR, "..", "Programa_trashtarea", "trashtarea")
 
 class TasksHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -96,13 +101,109 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, str(e))
 
+    def do_DELETE(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path.strip("/"))
+        qs = parse_qs(parsed.query)
+
+        if path.startswith("papelera/"):
+            filename = path[len("papelera/"):]
+            if filename:
+                self.handle_permanent_delete(filename)
+            else:
+                self.handle_empty_trash()
+        elif path.startswith("tareas/"):
+            filename = path[len("tareas/"):]
+            if filename.startswith("papelera/"):
+                self.handle_permanent_delete(filename[len("papelera/"):])
+            else:
+                self.handle_trash_task(filename)
+        elif path == "tareas" and "proyecto" in qs:
+            self.handle_trash_project(qs["proyecto"][0])
+        elif path == "papelera":
+            self.handle_empty_trash()
+        else:
+            self.send_error(404, "Not found")
+
+    def handle_trash_task(self, filename):
+        if not filename.endswith(".json"):
+            filename += ".json"
+        self._run_trashtarea([filename])
+
+    def handle_trash_project(self, proyecto):
+        self._run_trashtarea(["-p", proyecto])
+
+    def handle_empty_trash(self):
+        self._run_trashtarea(["-e", "-f"])
+
+    def handle_permanent_delete(self, filename):
+        if not filename.endswith(".json"):
+            filename += ".json"
+        self._run_trashtarea(["-d", filename])
+
+    def handle_restore_task(self, path):
+        try:
+            filename = path[len("papelera/"):-len("/restore")]
+            src = os.path.join(PAPELERA_DIR, filename)
+
+            if not os.path.realpath(src).startswith(os.path.realpath(PAPELERA_DIR)):
+                self.send_error(403, "Forbidden")
+                return
+
+            if not os.path.isfile(src):
+                self.send_error(404, "File not found in papelera")
+                return
+
+            dst = os.path.join(TASKS_DIR, filename)
+            os.rename(src, dst)
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_restore_project(self, proyecto):
+        if not proyecto:
+            self.send_error(400, "Missing proyecto")
+            return
+        self._run_trashtarea(["-r", "-p", proyecto])
+
+    def _run_trashtarea(self, args):
+        try:
+            result = subprocess.run(
+                [sys.executable, TRASHTAREA] + args,
+                capture_output=True, text=True, timeout=30
+            )
+            if result.returncode == 0:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "ok", "message": result.stdout.strip()}).encode())
+            else:
+                self.send_error(500, result.stderr.strip())
+        except subprocess.TimeoutExpired:
+            self.send_error(500, "trashtarea timed out")
+        except Exception as e:
+            self.send_error(500, str(e))
+
     def do_POST(self):
         path = unquote(self.path.strip("/"))
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
 
         if path == "pool" or path.startswith("pool/"):
             self.handle_create_pool_task(path)
         elif path.startswith("papelera/") and path.endswith("/restore"):
-            self.handle_restore_task(path)
+            if qs.get("proyecto"):
+                self.handle_restore_project(qs["proyecto"][0])
+            else:
+                self.handle_restore_task(path)
+        elif path == "papelera/restore/project":
+            self.handle_restore_project(qs.get("proyecto", [""])[0])
+        elif path == "papelera/empty":
+            self.handle_empty_trash()
         else:
             self.handle_create_clasificada_task(path)
 
@@ -214,7 +315,7 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, PUT, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         super().end_headers()
 

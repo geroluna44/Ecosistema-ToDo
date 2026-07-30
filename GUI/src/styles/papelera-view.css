@@ -137,3 +137,73 @@
   background-color: var(--state-available);
   color: var(--bg-main);
 }
+
+.papelera-item-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.papelera-delete-btn {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--state-blocked);
+  background-color: transparent;
+  border: 1px solid var(--state-blocked);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.papelera-delete-btn:hover {
+  background-color: var(--state-blocked);
+  color: var(--text-heading);
+}
+
+.papelera-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0 8px;
+  flex-shrink: 0;
+}
+
+.papelera-empty-btn {
+  padding: 6px 14px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--state-blocked);
+  background-color: transparent;
+  border: 1px solid var(--state-blocked);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.papelera-empty-btn:hover {
+  background-color: var(--state-blocked);
+  color: var(--text-heading);
+}
+
+.papelera-projects {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.papelera-restore-project-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--state-available);
+  background-color: transparent;
+  border: 1px solid var(--state-available);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.papelera-restore-project-btn:hover {
+  background-color: var(--state-available);
+  color: var(--bg-main);
+}

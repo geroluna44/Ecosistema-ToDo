@@ -7,7 +7,10 @@ interface SkillTreeProps {
   projects: Map<string, TareaRelacionada[]>;
   onToggleComplete: (filename: string) => void;
   onEditTask: (filename: string) => void;
+  onTrashTask: (filename: string) => void;
+  onTrashProject: (proyecto: string) => void;
   zoom: number;
+  layoutVersion: number;
 }
 
 interface NodePosition {
@@ -21,7 +24,7 @@ interface NodePosition {
 const NODE_W = 260;
 const NODE_H = 120;
 const COL_GAP = 60;
-const ROW_GAP = 20;
+const ROW_GAP = 40;
 
 function computeLayout(
   projects: Map<string, TareaRelacionada[]>,
@@ -48,11 +51,12 @@ function computeLayout(
   return positions;
 }
 
-export function SkillTree({ projects, onToggleComplete, onEditTask, zoom }: SkillTreeProps) {
+export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, zoom, layoutVersion }: SkillTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null);
   const wasDraggedRef = useRef(false);
   const zoomRef = useRef(zoom);
+  const [stickyNodeId, setStickyNodeId] = useState<string | null>(null);
   zoomRef.current = zoom;
 
   const tasksMap = useMemo(() => {
@@ -96,25 +100,14 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, zoom }: Skil
       }
     });
 
-    projects.forEach((tareas) => {
-      let rowY: number | null = null;
-      tareas.forEach((tarea) => {
-        const pos = newPositions.get(tarea.id);
-        if (!pos) return;
-        if (rowY === null) {
-          rowY = pos.y;
-        } else {
-          if (pos.y !== rowY) changed = true;
-          newPositions.set(tarea.id, { ...pos, y: rowY });
-        }
-        rowY! += pos.height + ROW_GAP;
-      });
-    });
-
     if (changed) {
       setNodePositions(newPositions);
     }
   }, [zoom, projects, nodePositions]);
+
+  useEffect(() => {
+    setNodePositions(computeLayout(projects, tasksMap));
+  }, [layoutVersion, projects, tasksMap]);
 
   const projectsArray = useMemo(() => Array.from(projects.entries()), [projects]);
 
@@ -190,6 +183,10 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, zoom }: Skil
                     tasksMap={tasksMap}
                     onToggleComplete={onToggleComplete}
                     onEdit={onEditTask}
+                    onTrash={onTrashTask}
+                    onTrashProject={onTrashProject}
+                    isStickyOpen={stickyNodeId === tarea.id}
+                    onToggleSticky={(id) => setStickyNodeId(prev => prev === id ? null : id)}
                     wasDraggedRef={wasDraggedRef}
                   />
                 </div>

@@ -1,0 +1,299 @@
+#!/usr/bin/env python3
+"""trashtarea: mueve tareas de ~/tareas/clasificadas/ a ~/tareas/papelera/ y viceversa.
+
+Uso:
+  trashtarea ARCHIVO.json [ARCHIVO2.json ...]
+  trashtarea -p PROYECTO
+  trashtarea -l, --list
+  trashtarea -r ARCHIVO.json [ARCHIVO2.json ...]
+  trashtarea -r -p PROYECTO
+  trashtarea -e, --empty
+  trashtarea -d ARCHIVO.json [ARCHIVO2.json ...]
+
+Comandos:
+  (sin flag)           Mueve uno o mas archivos .json de clasificadas/ a papelera/.
+  -p PROYECTO          Mueve todas las tareas de PROYECTO a la papelera.
+  -d, --delete         Elimina permanentemente archivos .json de la papelera.
+  -l, --list           Lista el contenido de la papelera.
+  -r, --restore        Restaura uno o mas archivos .json de papelera/ a clasificadas/.
+  -r -p PROYECTO       Restaura todas las tareas de PROYECTO.
+  -e, --empty          Vacia la papelera permanentemente (pide confirmacion).
+
+Exit codes:
+  0   exito
+  1   error de I/O
+  2   uso invalido
+  130 cancelado (Ctrl+C)
+"""
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+
+CLASIFICADAS = Path.home() / "tareas" / "clasificadas"
+PAPELERA = Path.home() / "tareas" / "papelera"
+
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+def _find_available(directory: Path, stem: str, ext: str) -> str:
+    """Genera un nombre unico en `directory` anadiendo -2, -3, ... si existe."""
+    candidate = directory / f"{stem}{ext}"
+    if not candidate.exists():
+        return candidate.name
+    n = 2
+    while True:
+        candidate = directory / f"{stem}-{n}{ext}"
+        if not candidate.exists():
+            return candidate.name
+        n += 1
+
+
+def _ensure_dirs() -> None:
+    CLASIFICADAS.mkdir(parents=True, exist_ok=True)
+    PAPELERA.mkdir(parents=True, exist_ok=True)
+
+
+def _resolve_json(name: str) -> str:
+    """Agrega .json si no lo tiene."""
+    return name if name.endswith(".json") else f"{name}.json"
+
+
+# ---------------------------------------------------------------------------
+# acciones
+# ---------------------------------------------------------------------------
+
+def trash_tasks(filenames: list[str]) -> int:
+    """Mueve archivos .json de clasificadas/ a papelera/."""
+    _ensure_dirs()
+    exit_code = 0
+    for name in filenames:
+        name = _resolve_json(name)
+        src = CLASIFICADAS / name
+        if not src.exists():
+            print(f"trashtarea: '{name}' no existe en {CLASIFICADAS}", file=sys.stderr)
+            exit_code = 1
+            continue
+        stem = src.stem
+        dest_name = _find_available(PAPELERA, stem, ".json")
+        dst = PAPELERA / dest_name
+        try:
+            src.rename(dst)
+            print(f"Tarea '{name}' movida a papelera como '{dest_name}'")
+        except OSError as e:
+            print(f"trashtarea: error al mover '{name}': {e}", file=sys.stderr)
+            exit_code = 1
+    return exit_code
+
+
+def trash_project(proyecto: str) -> int:
+    """Mueve todas las tareas cuyo campo Proyecto coincide."""
+    _ensure_dirs()
+    if not CLASIFICADAS.exists():
+        print(f"trashtarea: no existe {CLASIFICADAS}", file=sys.stderr)
+        return 1
+    names = []
+    for f in CLASIFICADAS.iterdir():
+        if f.suffix != ".json":
+            continue
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            if data.get("Proyecto", "") == proyecto:
+                names.append(f.name)
+        except (json.JSONDecodeError, OSError):
+            continue
+    if not names:
+        print(f"trashtarea: no se encontraron tareas del proyecto '{proyecto}' en {CLASIFICADAS}", file=sys.stderr)
+        return 1
+    return trash_tasks(names)
+
+
+def list_trash() -> int:
+    """Lista el contenido de la papelera."""
+    _ensure_dirs()
+    if not PAPELERA.exists():
+        return 0
+    items = sorted(f for f in PAPELERA.iterdir() if f.suffix == ".json")
+    if not items:
+        print("Papelera vacia")
+        return 0
+    for f in items:
+        nombre = f.stem
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            nombre = data.get("Nombre", f.stem)
+        except (json.JSONDecodeError, OSError):
+            pass
+        print(f"{f.name:40s} {nombre}")
+    return 0
+
+
+def restore_tasks(filenames: list[str]) -> int:
+    """Restaura archivos .json de papelera/ a clasificadas/."""
+    _ensure_dirs()
+    exit_code = 0
+    for name in filenames:
+        name = _resolve_json(name)
+        src = PAPELERA / name
+        if not src.exists():
+            print(f"trashtarea: '{name}' no existe en {PAPELERA}", file=sys.stderr)
+            exit_code = 1
+            continue
+        stem = src.stem
+        dest_name = _find_available(CLASIFICADAS, stem, ".json")
+        dst = CLASIFICADAS / dest_name
+        try:
+            src.rename(dst)
+            print(f"Tarea '{name}' restaurada como '{dest_name}'")
+        except OSError as e:
+            print(f"trashtarea: error al restaurar '{name}': {e}", file=sys.stderr)
+            exit_code = 1
+    return exit_code
+
+
+def restore_project(proyecto: str) -> int:
+    """Restaura todas las tareas cuyo campo Proyecto coincide desde la papelera."""
+    _ensure_dirs()
+    if not PAPELERA.exists():
+        print(f"trashtarea: no existe {PAPELERA}", file=sys.stderr)
+        return 1
+    names = []
+    for f in PAPELERA.iterdir():
+        if f.suffix != ".json":
+            continue
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            if data.get("Proyecto", "") == proyecto:
+                names.append(f.name)
+        except (json.JSONDecodeError, OSError):
+            continue
+    if not names:
+        print(f"trashtarea: no se encontraron tareas del proyecto '{proyecto}' en la papelera", file=sys.stderr)
+        return 1
+    return restore_tasks(names)
+
+
+def delete_files(filenames: list[str]) -> int:
+    """Elimina permanentemente archivos .json de la papelera."""
+    _ensure_dirs()
+    exit_code = 0
+    for name in filenames:
+        name = _resolve_json(name)
+        target = PAPELERA / name
+        if not target.exists():
+            print(f"trashtarea: '{name}' no existe en {PAPELERA}", file=sys.stderr)
+            exit_code = 1
+            continue
+        try:
+            target.unlink()
+            print(f"Eliminada permanentemente: {name}")
+        except OSError as e:
+            print(f"trashtarea: error al eliminar '{name}': {e}", file=sys.stderr)
+            exit_code = 1
+    return exit_code
+
+
+def empty_trash(force: bool = False) -> int:
+    """Vacia la papelera permanentemente."""
+    _ensure_dirs()
+    if not PAPELERA.exists():
+        return 0
+    items = [f for f in PAPELERA.iterdir() if f.suffix == ".json"]
+    if not items:
+        print("Papelera ya vacia")
+        return 0
+    if not force:
+        print(f"Esto eliminara permanentemente {len(items)} tarea(s) de la papelera.", file=sys.stderr)
+        print("Escriba 'si' para confirmar: ", end="", file=sys.stderr)
+        try:
+            resp = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print("\ntrashtarea: cancelado", file=sys.stderr)
+            return 130
+        if resp != "si":
+            print("Cancelado", file=sys.stderr)
+            return 0
+    for f in items:
+        try:
+            f.unlink()
+            print(f"Eliminada: {f.name}")
+        except OSError as e:
+            print(f"trashtarea: error al eliminar '{f.name}': {e}", file=sys.stderr)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="trashtarea",
+        description="Gestiona la papelera de tareas: mueve/restaura/lista/vacia.",
+        epilog=(
+            "Ejemplos:\n"
+            "  trashtarea 20260727183902.json\n"
+            "  trashtarea 20260727183902.json 20260727183903.json\n"
+            "  trashtarea -p \"Proyecto X\"\n"
+            "  trashtarea -l\n"
+            "  trashtarea -r 20260727183902.json\n"
+            "  trashtarea -r -p \"Proyecto X\"\n"
+            "  trashtarea -d 20260727183902.json\n"
+            "  trashtarea -e"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("archivos", nargs="*", metavar="ARCHIVO.json",
+                        help="Archivo(s) .json a mover/restaurar")
+    parser.add_argument("-p", "--proyecto", metavar="PROYECTO",
+                        help="Operar sobre todas las tareas de un proyecto")
+    parser.add_argument("-l", "--list", action="store_true",
+                        help="Listar contenido de la papelera")
+    parser.add_argument("-r", "--restore", action="store_true",
+                        help="Restaurar archivo(s) o proyecto desde la papelera")
+    parser.add_argument("-d", "--delete", action="store_true",
+                        help="Eliminar permanentemente archivo(s) de la papelera")
+    parser.add_argument("-e", "--empty", action="store_true",
+                        help="Vaciar la papelera permanentemente")
+    parser.add_argument("-f", "--force", action="store_true",
+                        help="Saltar confirmacion al vaciar la papelera")
+
+    args = parser.parse_args()
+
+    # --list
+    if args.list:
+        return list_trash()
+
+    # --delete
+    if args.delete:
+        if not args.archivos:
+            parser.error("--delete requiere ARCHIVO.json")
+        return delete_files(args.archivos)
+
+    # --empty
+    if args.empty:
+        return empty_trash(force=args.force)
+
+    # --restore
+    if args.restore:
+        if args.proyecto:
+            return restore_project(args.proyecto)
+        if args.archivos:
+            return restore_tasks(args.archivos)
+        parser.error("--restore requiere ARCHIVO.json o -p PROYECTO")
+
+    # trash (sin flag)
+    if args.proyecto:
+        return trash_project(args.proyecto)
+    if args.archivos:
+        return trash_tasks(args.archivos)
+
+    parser.error("Se requiere ARCHIVO.json, -p PROYECTO, -l, -r o -e")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

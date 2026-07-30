@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Tarea } from '../types/task';
-import { readPapeleraTasks, restoreTask } from '../services/taskService';
+import { readPapeleraTasks, restoreTask, restoreProject, deleteTask } from '../services/taskService';
 import '../styles/papelera-view.css';
 
 interface PapeleraViewProps {
   onBack: () => void;
+  onEmptyTrash: () => void;
 }
 
-export function PapeleraView({ onBack }: PapeleraViewProps) {
+export function PapeleraView({ onBack, onEmptyTrash: onEmptyTrashProp }: PapeleraViewProps) {
   const [tasks, setTasks] = useState<Map<string, Tarea> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +39,44 @@ export function PapeleraView({ onBack }: PapeleraViewProps) {
     }
   };
 
+  const handlePermanentDelete = async (filename: string) => {
+    if (!confirm(`¿Eliminar permanentemente esta tarea? No se podrá recuperar.`)) return;
+    try {
+      await deleteTask(`papelera/${filename}`);
+      load();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    if (!confirm(`¿Vaciar la papelera? Se eliminarán todas las tareas permanentemente.`)) return;
+    try {
+      await onEmptyTrashProp();
+      setTasks(new Map());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleRestoreProject = async (proyecto: string) => {
+    try {
+      await restoreProject(proyecto);
+      load();
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const projectsInTrash = useMemo(() => {
+    if (!tasks) return [];
+    const projects = new Set<string>();
+    tasks.forEach((task) => {
+      if (task.Proyecto) projects.add(task.Proyecto);
+    });
+    return Array.from(projects).sort();
+  }, [tasks]);
+
   return (
     <div className="papelera-view">
       <div className="papelera-header">
@@ -57,6 +96,25 @@ export function PapeleraView({ onBack }: PapeleraViewProps) {
 
       {!loading && !error && tasks && tasks.size > 0 && (
         <div className="papelera-list">
+          <div className="papelera-toolbar">
+            {projectsInTrash.length > 0 && (
+              <div className="papelera-projects">
+                {projectsInTrash.map((proyecto) => (
+                  <button
+                    key={proyecto}
+                    className="papelera-restore-project-btn"
+                    onClick={() => handleRestoreProject(proyecto)}
+                    title={`Restaurar proyecto "${proyecto}"`}
+                  >
+                    ↩️ {proyecto}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button className="papelera-empty-btn" onClick={handleEmptyTrash}>
+              🗑️ Vaciar papelera
+            </button>
+          </div>
           {Array.from(tasks.entries()).map(([filename, task]) => (
             <div key={filename} className="papelera-item">
               <div className="papelera-item-header">
@@ -75,12 +133,20 @@ export function PapeleraView({ onBack }: PapeleraViewProps) {
                     : task.Descripcion}
                 </div>
               )}
-              <button
-                className="papelera-restore-btn"
-                onClick={() => handleRestore(filename)}
-              >
-                Restaurar
-              </button>
+              <div className="papelera-item-actions">
+                <button
+                  className="papelera-restore-btn"
+                  onClick={() => handleRestore(filename)}
+                >
+                  ↩️ Restaurar
+                </button>
+                <button
+                  className="papelera-delete-btn"
+                  onClick={() => handlePermanentDelete(filename)}
+                >
+                  🗑️ Eliminar
+                </button>
+              </div>
             </div>
           ))}
         </div>
