@@ -22,7 +22,15 @@ export interface TareaRelacionada extends Tarea {
   tieneHijosPendientes: boolean;
 }
 
-export type Vista = 'arbol' | 'calendario' | 'nodos' | 'papelera';
+export type Vista = 'arbol' | 'calendario' | 'nodos' | 'papelera' | 'lista';
+
+export type ListMode = 'clasificadas' | 'pool' | 'both';
+
+export interface PoolTask {
+  filename: string;
+  nombre: string;
+  descripcion: string;
+}
 
 export interface PosicionNodo {
   id: string;

@@ -6,6 +6,7 @@ import { QuickAddFAB } from './components/QuickAddFAB';
 import { EditTaskForm } from './components/EditTaskForm';
 import { HamburgerMenu } from './components/HamburgerMenu';
 import { PapeleraView } from './components/PapeleraView';
+import { ListView } from './components/ListView/ListView';
 import { Tarea, Vista } from './types/task';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { deleteTask, trashProject, emptyTrash, updateConnection, removeConnection } from './services/taskService';
@@ -19,8 +20,8 @@ function clamp(val: number, min: number, max: number) {
 }
 
 function App() {
-  const { tasks, loading, error, toggleComplete, reload } = useTasks();
-  const [vistaActiva, setVistaActiva] = useState<Vista>('arbol');
+  const { tasks, poolTasks, loading, error, toggleComplete, reload } = useTasks();
+  const [vistaActiva, setVistaActiva] = useState<Vista>('lista');
   const [zoom, setZoom] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
@@ -231,15 +232,26 @@ function App() {
         {vistaActiva !== 'papelera' && (
           <>
             <ViewSelector vistaActiva={vistaActiva} onVistaChange={setVistaActiva} />
-            <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onZoomReset={zoomReset} onPanBy={panBy} onPanHome={panHome} />
+            {vistaActiva === 'arbol' && (
+              <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onZoomReset={zoomReset} onPanBy={panBy} onPanHome={panHome} />
+            )}
             <QuickAddFAB />
           </>
         )}
-        
+
         {loading && <div className="loading">Cargando tareas...</div>}
-        
+
         {error && <div className="error">Error: {error}</div>}
-        
+
+        {!loading && !error && vistaActiva === 'lista' && (
+          <ListView
+            tasks={tasks}
+            poolTasks={poolTasks}
+            onEdit={handleEditTask}
+            onReload={reload}
+          />
+        )}
+
         {!loading && !error && vistaActiva === 'arbol' && (
           <div
             ref={viewportCallbackRef}
@@ -284,11 +296,11 @@ function App() {
             </div>
           </div>
         )}
-        
+
         {!loading && !error && vistaActiva === 'calendario' && (
           <div className="loading">Vista calendario (próximamente)</div>
         )}
-        
+
         {!loading && !error && vistaActiva === 'nodos' && (
           <div className="loading">Vista de nodos (próximamente)</div>
         )}

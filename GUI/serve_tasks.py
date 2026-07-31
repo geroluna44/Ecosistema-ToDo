@@ -15,6 +15,7 @@ PORT = 8080
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 TRASHTAREA = os.path.join(THIS_DIR, "..", "Programa_trashtarea", "trashtarea")
+CLATAREA = os.path.join(THIS_DIR, "..", "Programa_clatarea", "clatarea.py")
 
 class TasksHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -26,6 +27,9 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         if path.startswith("/papelera/"):
             relative = path[len("/papelera/"):]
             self.handle_papelera_get(relative)
+        elif path.startswith("/pool/"):
+            relative = path[len("/pool/"):]
+            self.handle_pool_get(relative)
         else:
             super().do_GET()
 
@@ -56,6 +60,60 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_pool_get(self, relative):
+        if not relative or relative == "/":
+            self.list_pool_json()
+            return
+
+        import urllib.parse
+        filename = urllib.parse.unquote(relative)
+        if not filename.endswith(".txt"):
+            self.send_error(400, "Pool files must be .txt")
+            return
+
+        filepath = os.path.join(POOL_DIR, filename)
+        if not os.path.realpath(filepath).startswith(os.path.realpath(POOL_DIR)):
+            self.send_error(403, "Forbidden")
+            return
+        if not os.path.isfile(filepath):
+            self.send_error(404, "Not found")
+            return
+
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                content = f.read()
+            payload = json.dumps({"filename": filename, "content": content}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def list_pool_json(self):
+        try:
+            entries = sorted(
+                f for f in os.listdir(POOL_DIR)
+                if os.path.isfile(os.path.join(POOL_DIR, f)) and f.endswith(".txt")
+            )
+            items = []
+            for name in entries:
+                filepath = os.path.join(POOL_DIR, name)
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        content = f.read()
+                except OSError:
+                    content = ""
+                items.append({"filename": name, "content": content})
+
+            payload = json.dumps(items).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+        except OSError as e:
             self.send_error(500, str(e))
 
     def list_directory_html(self, directory):
@@ -193,8 +251,11 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         qs = parse_qs(parsed.query)
 
-        if path == "pool" or path.startswith("pool/"):
+        if path == "pool" or path == "pool/" or (path.startswith("pool/") and not path.endswith("/clasificar")):
             self.handle_create_pool_task(path)
+        elif path.startswith("pool/") and path.endswith("/clasificar"):
+            filename = path[len("pool/"):-len("/clasificar")]
+            self.handle_clasificar_pool_task(filename)
         elif path.startswith("papelera/") and path.endswith("/restore"):
             if qs.get("proyecto"):
                 self.handle_restore_project(qs["proyecto"][0])
@@ -289,6 +350,62 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(json.dumps({"status": "ok", "filename": filename}).encode())
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_clasificar_pool_task(self, filename):
+        try:
+            if not filename.endswith(".txt"):
+                filename += ".txt"
+            filepath = os.path.join(POOL_DIR, filename)
+
+            if not os.path.realpath(filepath).startswith(os.path.realpath(POOL_DIR)):
+                self.send_error(403, "Forbidden")
+                return
+            if not os.path.isfile(filepath):
+                self.send_error(404, "Pool file not found")
+                return
+
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode("utf-8"))
+
+            args = [sys.executable, CLATAREA, filename]
+            field_map = {
+                "lugar": "Lugar de trabajo",
+                "proyecto": "Proyecto",
+                "descripcion": "Descripcion",
+                "primer_paso": "Primer paso",
+                "rango_tiempo": "Rango de tiempo",
+                "urgencia": "Urgencia",
+                "deadline": "Deadline",
+                "tarea_padre": "Tarea Padre",
+                "tarea_hija": "Tarea Hija",
+            }
+            for key, value in data.items():
+                if key == "nombre":
+                    continue
+                if value is None or value == "":
+                    continue
+                campo = field_map.get(key, key)
+                args.extend(["-m", f"{campo}={value}"])
+
+            result = subprocess.run(
+                args, capture_output=True, text=True, timeout=30
+            )
+            if result.returncode != 0:
+                self.send_error(500, result.stderr.strip() or "clatarea failed")
+                return
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "status": "ok",
+                "message": result.stdout.strip(),
+            }).encode())
+        except subprocess.TimeoutExpired:
+            self.send_error(500, "clatarea timed out")
         except Exception as e:
             self.send_error(500, str(e))
 

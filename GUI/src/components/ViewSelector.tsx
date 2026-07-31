@@ -13,6 +13,13 @@ export function ViewSelector({ vistaActiva, onVistaChange }: ViewSelectorProps) 
     <div className={`view-selector ${minimized ? 'minimized' : ''}`}>
       <div className="view-selector-icons">
         <button
+          className={`view-selector-btn ${vistaActiva === 'lista' ? 'active' : ''}`}
+          onClick={() => onVistaChange('lista')}
+          title="Lista"
+        >
+          📋
+        </button>
+        <button
           className={`view-selector-btn ${vistaActiva === 'arbol' ? 'active' : ''}`}
           onClick={() => onVistaChange('arbol')}
           title="Árbol de habilidades"

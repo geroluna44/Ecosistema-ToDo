@@ -1,4 +1,4 @@
-import { Tarea } from '../types/task';
+import { Tarea, PoolTask } from '../types/task';
 
 const TASKS_DIR = '/home/gero/tareas/clasificadas';
 const POOL_DIR = '/home/gero/tareas/pool';
@@ -10,6 +10,8 @@ interface TaskServerConfig {
   putUrl: (filename: string) => string;
   postPoolUrl: string;
   postTaskUrl: string;
+  poolListUrl: string;
+  clasificarPoolUrl: (filename: string) => string;
 }
 
 const DEV_CONFIG: TaskServerConfig = {
@@ -18,6 +20,8 @@ const DEV_CONFIG: TaskServerConfig = {
   putUrl: (f: string) => `/tareas/${f}`,
   postPoolUrl: '/tareas/pool',
   postTaskUrl: '/tareas/',
+  poolListUrl: '/tareas/pool/',
+  clasificarPoolUrl: (f: string) => `/tareas/pool/${f}/clasificar`,
 };
 
 const PROD_CONFIG: TaskServerConfig = {
@@ -26,6 +30,8 @@ const PROD_CONFIG: TaskServerConfig = {
   putUrl: (f: string) => `${TASKS_DIR}/${f}`,
   postPoolUrl: POOL_DIR,
   postTaskUrl: TASKS_DIR,
+  poolListUrl: `${POOL_DIR}/`,
+  clasificarPoolUrl: (f: string) => `${POOL_DIR}/${f}/clasificar`,
 };
 
 const isDevelopment = import.meta.env.DEV;
@@ -261,4 +267,65 @@ export async function emptyTrash(): Promise<void> {
   } else {
     throw new Error('emptyTrash not supported in production mode');
   }
+}
+
+export interface ClasificarPoolInput {
+  lugar?: string;
+  proyecto?: string;
+  descripcion?: string;
+  primer_paso?: string;
+  rango_tiempo?: number;
+  urgencia?: 'A' | 'B' | 'C';
+  deadline?: number;
+  tarea_padre?: string;
+  tarea_hija?: string;
+}
+
+function parsePoolTxt(filename: string, content: string): PoolTask {
+  const trimmed = content.replace(/\r\n/g, '\n').trim();
+  if (!trimmed) {
+    const stem = filename.replace(/\.txt$/i, '');
+    return { filename, nombre: stem, descripcion: '' };
+  }
+  const parts = trimmed.split(/\n{2,}/);
+  const nombre = (parts[0] ?? '').trim() || filename.replace(/\.txt$/i, '');
+  const descripcion = parts.slice(1).join('\n\n').trim();
+  return { filename, nombre, descripcion };
+}
+
+export async function readPoolTasks(): Promise<Map<string, PoolTask>> {
+  const tasks = new Map<string, PoolTask>();
+  try {
+    const response = await fetch(serverConfig.poolListUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json() as Array<{ filename: string; content: string }>;
+    data.forEach((entry) => {
+      if (!entry || !entry.filename) return;
+      tasks.set(entry.filename, parsePoolTxt(entry.filename, entry.content));
+    });
+  } catch (e) {
+    console.error('Error reading pool directory:', e);
+    throw e;
+  }
+  return tasks;
+}
+
+export async function clasificarPoolTask(filename: string, input: ClasificarPoolInput): Promise<{ status: string; message: string }> {
+  const response = await fetch(serverConfig.clasificarPoolUrl(filename), {
+    method: 'POST',
+    body: JSON.stringify(input),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!response.ok) {
+    let detail = '';
+    try {
+      detail = await response.text();
+    } catch {}
+    throw new Error(`Failed to clasificar ${filename}: ${detail || response.status}`);
+  }
+  return response.json();
 }

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Tarea, TareaRelacionada } from '../types/task';
-import { readTasks, writeTask } from '../services/taskService';
+import { Tarea, TareaRelacionada, PoolTask } from '../types/task';
+import { readTasks, writeTask, readPoolTasks } from '../services/taskService';
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Map<string, Tarea>>(new Map());
+  const [poolTasks, setPoolTasks] = useState<Map<string, PoolTask>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -11,8 +12,12 @@ export function useTasks() {
     try {
       setLoading(true);
       setError(null);
-      const loadedTasks = await readTasks();
+      const [loadedTasks, loadedPool] = await Promise.all([
+        readTasks(),
+        readPoolTasks().catch(() => new Map<string, PoolTask>()),
+      ]);
       setTasks(loadedTasks);
+      setPoolTasks(loadedPool);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error loading tasks');
     } finally {
@@ -50,6 +55,7 @@ export function useTasks() {
 
   return {
     tasks,
+    poolTasks,
     loading,
     error,
     toggleComplete,
