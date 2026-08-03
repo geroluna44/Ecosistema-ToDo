@@ -28,29 +28,88 @@ interface NodePosition {
 
 const NODE_W = 260;
 const NODE_H = 120;
-const COL_GAP = 60;
-const ROW_GAP = 40;
+const COL_GAP = 80;
+const ROW_GAP = 60;
+const SIBLING_GAP = 50;
 
 function computeLayout(
   projects: Map<string, TareaRelacionada[]>,
-  _tasksMap: Map<string, TareaRelacionada>,
+  tasksMap: Map<string, TareaRelacionada>,
 ): Map<string, NodePosition> {
   const positions = new Map<string, NodePosition>();
 
+  const childrenMap = new Map<string, string[]>();
+  tasksMap.forEach((task) => {
+    const parentId = task['Tarea Padre'];
+    if (parentId) {
+      const list = childrenMap.get(parentId) || [];
+      list.push(task.id);
+      childrenMap.set(parentId, list);
+    }
+  });
+
+  const subtreeWidth = (nodeId: string): number => {
+    const children = childrenMap.get(nodeId) || [];
+    if (children.length === 0) return NODE_W;
+    const total = children.reduce((sum, childId, i) => {
+      return sum + subtreeWidth(childId) + (i < children.length - 1 ? SIBLING_GAP : 0);
+    }, 0);
+    return Math.max(NODE_W, total);
+  };
+
+  const layoutSubtree = (nodeId: string, x: number, y: number): void => {
+    const children = childrenMap.get(nodeId) || [];
+    const width = subtreeWidth(nodeId);
+
+    positions.set(nodeId, {
+      id: nodeId,
+      x: x + width / 2 - NODE_W / 2,
+      y,
+      width: NODE_W,
+      height: NODE_H,
+    });
+
+    if (children.length > 0) {
+      const totalChildrenWidth = children.reduce((sum, childId, i) => {
+        return sum + subtreeWidth(childId) + (i < children.length - 1 ? SIBLING_GAP : 0);
+      }, 0);
+      let childX = x + (width - totalChildrenWidth) / 2;
+
+      children.forEach((childId) => {
+        const childWidth = subtreeWidth(childId);
+        layoutSubtree(childId, childX, y + NODE_H + ROW_GAP);
+        childX += childWidth + SIBLING_GAP;
+      });
+    }
+  };
+
   let colX = 40;
   projects.forEach((tareas) => {
-    let rowY = 40;
-    tareas.forEach((tarea) => {
-      positions.set(tarea.id, {
-        id: tarea.id,
-        x: colX,
-        y: rowY,
-        width: NODE_W,
-        height: NODE_H,
-      });
-      rowY += NODE_H + ROW_GAP;
+    const roots = tareas.filter((t) => t.esRaiz);
+    const nonRoots = tareas.filter((t) => !t.esRaiz);
+
+    let projectX = colX;
+    let maxProjectWidth = 0;
+    roots.forEach((root) => {
+      layoutSubtree(root.id, projectX, 40);
+      const w = subtreeWidth(root.id);
+      maxProjectWidth = Math.max(maxProjectWidth, w);
+      projectX += w + SIBLING_GAP;
     });
-    colX += NODE_W + COL_GAP;
+
+    nonRoots.forEach((tarea) => {
+      if (!positions.has(tarea.id)) {
+        positions.set(tarea.id, {
+          id: tarea.id,
+          x: colX,
+          y: 40,
+          width: NODE_W,
+          height: NODE_H,
+        });
+      }
+    });
+
+    colX += Math.max(NODE_W, maxProjectWidth) + COL_GAP;
   });
 
   return positions;
