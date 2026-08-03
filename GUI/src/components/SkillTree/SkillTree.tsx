@@ -32,6 +32,25 @@ const COL_GAP = 80;
 const ROW_GAP = 60;
 const SIBLING_GAP = 50;
 
+function checkCollision(
+  rect: { x: number; y: number; width: number; height: number },
+  allPositions: Map<string, NodePosition>,
+  excludeId: string
+): string | null {
+  for (const [id, other] of allPositions) {
+    if (id === excludeId) continue;
+    if (
+      rect.x < other.x + other.width &&
+      rect.x + rect.width > other.x &&
+      rect.y < other.y + other.height &&
+      rect.y + rect.height > other.y
+    ) {
+      return id;
+    }
+  }
+  return null;
+}
+
 function computeLayout(
   projects: Map<string, TareaRelacionada[]>,
   tasksMap: Map<string, TareaRelacionada>,
@@ -217,9 +236,37 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
       setNodePositions(prev => {
         const p = prev.get(d.id);
         if (!p) return prev;
+
+        const alreadyOverlapping = checkCollision(p, prev, d.id);
+
+        const newX = p.x + dx;
+        const newY = p.y + dy;
         const next = new Map(prev);
-        next.set(d.id, { ...p, x: p.x + dx, y: p.y + dy });
-        return next;
+
+        if (alreadyOverlapping) {
+          next.set(d.id, { ...p, x: newX, y: newY });
+          return next;
+        }
+
+        const testFull = { x: newX, y: newY, width: p.width, height: p.height };
+        if (!checkCollision(testFull, prev, d.id)) {
+          next.set(d.id, { ...p, x: newX, y: newY });
+          return next;
+        }
+
+        const testX = { x: newX, y: p.y, width: p.width, height: p.height };
+        if (!checkCollision(testX, prev, d.id)) {
+          next.set(d.id, { ...p, x: newX });
+          return next;
+        }
+
+        const testY = { x: p.x, y: newY, width: p.width, height: p.height };
+        if (!checkCollision(testY, prev, d.id)) {
+          next.set(d.id, { ...p, y: newY });
+          return next;
+        }
+
+        return prev;
       });
     };
 

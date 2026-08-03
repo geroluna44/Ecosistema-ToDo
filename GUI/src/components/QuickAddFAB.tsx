@@ -76,7 +76,7 @@ function AddTaskForm({ onClose }: { onClose: () => void }) {
     <div className="quick-add-form-overlay" onClick={onClose}>
       <div className="quick-add-form" onClick={e => e.stopPropagation()}>
         <div className="quick-add-form-header">
-          <h3>AÑADIR TAREA</h3>
+          <h3>TAREA RÁPIDA</h3>
           <button className="quick-add-form-close" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -168,9 +168,9 @@ function QuickTaskForm({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="quick-add-form-overlay" onClick={onClose}>
-      <div className="quick-add-form quick-task-form" onClick={e => e.stopPropagation()}>
+        <div className="quick-add-form quick-task-form" onClick={e => e.stopPropagation()}>
         <div className="quick-add-form-header">
-          <h3>TAREA RÁPIDA</h3>
+          <h3>AÑADIR TAREA</h3>
           <button className="quick-add-form-close" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
