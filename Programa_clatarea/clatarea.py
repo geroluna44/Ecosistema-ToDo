@@ -22,6 +22,7 @@ CAMPS_FIJOS = {
     "Deadline",
     "Tarea Padre",
     "Tarea Hija",
+    "completado",
 }
 
 URGENCIAS_VALIDAS = {"A", "B", "C"}
@@ -50,6 +51,8 @@ SINONIMOS = {
     "tarea_hija": "Tarea Hija",
     "tarea_hijo": "Tarea Hija",
     "hija": "Tarea Hija",
+    "hecho": "completado",
+    "lista": "completado",
 }
 
 
@@ -71,6 +74,16 @@ def parsear_mods(args_mods):
         if campo == "Tarea Padre" or campo == "Tarea Hija":
             if not valor.endswith(".json"):
                 valor += ".json"
+        if campo == "completado":
+            v = valor.lower()
+            if v in ("true", "1", "si", "sí", "yes"):
+                valor = True
+            elif v in ("false", "0", "no"):
+                valor = False
+            else:
+                raise ValueError(
+                    f"Valor invalido para 'completado': '{valor}'. Usar true o false"
+                )
         mods[campo] = valor
     return mods
 
@@ -81,6 +94,8 @@ def validar_campos(mods):
             raise ValueError(f"Campo desconocido: '{campo}'. Campos validos: {', '.join(sorted(CAMPS_FIJOS))}")
     if "Urgencia" in mods and mods["Urgencia"] not in URGENCIAS_VALIDAS:
         raise ValueError(f"Urgencia invalida: '{mods['Urgencia']}'. Valores validos: {URGENCIAS_VALIDAS}")
+    if "completado" in mods and not isinstance(mods["completado"], bool):
+        raise ValueError("'completado' debe ser true o false")
 
 
 def generar_timestamp_base():
@@ -131,7 +146,8 @@ def main():
 Campos validos:
   Nombre, Lugar de trabajo, Proyecto, Descripcion, Primer paso,
   Rango de tiempo, Postergaciones, Urgencia (A|B|C),
-  Deadline (YYYYMMDDHHMMSS), Tarea Padre, Tarea Hija
+  Deadline (YYYYMMDDHHMMSS), Tarea Padre, Tarea Hija,
+  completado (true/false)
 """,
     )
     parser.add_argument(
