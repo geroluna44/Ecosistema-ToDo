@@ -492,6 +492,8 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_restore_project(qs.get("proyecto", [""])[0])
         elif path == "papelera/empty":
             self.handle_empty_trash()
+        elif path == "debug" or path == "debug/":
+            self.handle_debug_create_clasificada_task()
         else:
             self.handle_create_clasificada_task(path)
 
@@ -560,6 +562,47 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
             while os.path.exists(filepath):
                 filename = f"{base}-{n}.json"
                 filepath = os.path.join(TASKS_DIR, filename)
+                n += 1
+
+            tarea = {
+                "Nombre": data.get("nombre", "Sin nombre"),
+                "Lugar de trabajo": data.get("lugar", ""),
+                "Proyecto": data.get("proyecto", ""),
+                "Descripcion": data.get("descripcion", ""),
+                "Primer paso": data.get("primer_paso", ""),
+                "Rango de tiempo": data.get("rango_tiempo", 30),
+                "Postergaciones": 0,
+                "Urgencia": data.get("urgencia", "C"),
+                "Deadline": data.get("deadline", 0),
+                "Tarea Padre": data.get("tarea_padre", ""),
+                "Tarea Hija": data.get("tarea_hija", ""),
+            }
+
+            with open(filepath, "w", encoding="utf-8") as f:
+                json.dump(tarea, f, indent=4, ensure_ascii=False)
+
+            self.send_response(201)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok", "filename": filename}).encode())
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_debug_create_clasificada_task(self):
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            data = json.loads(body.decode("utf-8"))
+
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            base = timestamp
+            filename = f"{base}.json"
+            filepath = os.path.join(DEBUG_TASKS_DIR, filename)
+            n = 2
+            while os.path.exists(filepath):
+                filename = f"{base}-{n}.json"
+                filepath = os.path.join(DEBUG_TASKS_DIR, filename)
                 n += 1
 
             tarea = {
