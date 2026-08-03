@@ -202,6 +202,20 @@
   background-color: var(--bg-selection);
 }
 
+.list-view-table tr.completed {
+  opacity: 0.5;
+  background-color: var(--bg-hover);
+}
+
+.list-view-table tr.completed td {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.list-view-table tr.completed .col-nombre {
+  color: var(--text-muted);
+}
+
 .list-view-table .col-id {
   font-family: var(--font-mono);
   color: var(--text-muted);

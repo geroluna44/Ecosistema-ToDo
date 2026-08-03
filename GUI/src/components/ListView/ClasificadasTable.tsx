@@ -232,7 +232,10 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
                   <tr
                     key={filename}
                     onClick={(e) => handleRowClick(filename, e)}
-                    className={selectedFilename === filename ? 'selected' : ''}
+                    className={[
+                      selectedFilename === filename ? 'selected' : '',
+                      task.completado ? 'completed' : '',
+                    ].filter(Boolean).join(' ')}
                   >
                     <td className="col-id" title={filename}>{filename}</td>
                     <td className="col-nombre" title={task.Nombre}>{task.Nombre || '—'}</td>
