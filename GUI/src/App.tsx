@@ -288,7 +288,7 @@ function App() {
             {vistaActiva === 'arbol' && (
               <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onZoomReset={zoomReset} onPanBy={panBy} onPanHome={panHome} />
             )}
-            <QuickAddFAB tasks={tasks} />
+            <QuickAddFAB tasks={tasks} onReload={reload} />
           </>
         )}
 
@@ -369,7 +369,7 @@ function App() {
         )}
 
         {vistaActiva === 'papelera' && (
-          <PapeleraView onBack={() => setVistaActiva(previousViewRef.current)} onEmptyTrash={handleEmptyTrash} />
+          <PapeleraView onBack={() => setVistaActiva(previousViewRef.current)} onEmptyTrash={handleEmptyTrash} onReload={reload} />
         )}
       </main>
 

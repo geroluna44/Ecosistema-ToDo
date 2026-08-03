@@ -8,9 +8,10 @@ type MenuState = 'closed' | 'menu' | 'add' | 'quick';
 
 interface QuickAddFABProps {
   tasks: Map<string, Tarea>;
+  onReload?: () => void;
 }
 
-export function QuickAddFAB({ tasks }: QuickAddFABProps) {
+export function QuickAddFAB({ tasks, onReload }: QuickAddFABProps) {
   const [menuState, setMenuState] = useState<MenuState>('closed');
 
   const handleToggle = () => {
@@ -20,10 +21,10 @@ export function QuickAddFAB({ tasks }: QuickAddFABProps) {
   return (
     <div className="quick-add-fab-container">
       {menuState === 'add' && (
-        <AddTaskForm onClose={() => setMenuState('closed')} />
+        <AddTaskForm onClose={() => setMenuState('closed')} onReload={onReload} />
       )}
       {menuState === 'quick' && (
-        <QuickTaskForm tasks={tasks} onClose={() => setMenuState('closed')} />
+        <QuickTaskForm tasks={tasks} onClose={() => setMenuState('closed')} onReload={onReload} />
       )}
       <div className={`quick-add-fab ${menuState !== 'closed' ? 'active' : ''}`}>
         <button
@@ -54,7 +55,7 @@ export function QuickAddFAB({ tasks }: QuickAddFABProps) {
   );
 }
 
-function AddTaskForm({ onClose }: { onClose: () => void }) {
+function AddTaskForm({ onClose, onReload }: { onClose: () => void; onReload?: () => void }) {
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
   const [saving, setSaving] = useState(false);
@@ -71,6 +72,7 @@ function AddTaskForm({ onClose }: { onClose: () => void }) {
       await createPoolTask({ nombre: nombre.trim(), descripcion: descripcion.trim() });
       setNombre('');
       setDescripcion('');
+      onReload?.();
       onClose();
     } catch (err) {
       setError('Error al crear la tarea');
@@ -124,7 +126,7 @@ function AddTaskForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function QuickTaskForm({ tasks, onClose }: { tasks: Map<string, Tarea>; onClose: () => void }) {
+function QuickTaskForm({ tasks, onClose, onReload }: { tasks: Map<string, Tarea>; onClose: () => void; onReload?: () => void }) {
   const [formData, setFormData] = useState<ClasificadaTaskInput>({
     nombre: '',
     lugar: '',
@@ -177,6 +179,7 @@ function QuickTaskForm({ tasks, onClose }: { tasks: Map<string, Tarea>; onClose:
         tarea_padre: '',
         tarea_hija: '',
       });
+      onReload?.();
       onClose();
     } catch (err) {
       setError('Error al crear la tarea');

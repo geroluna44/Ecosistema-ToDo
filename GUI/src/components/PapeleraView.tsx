@@ -6,9 +6,10 @@ import '../styles/papelera-view.css';
 interface PapeleraViewProps {
   onBack: () => void;
   onEmptyTrash: () => void;
+  onReload?: () => void;
 }
 
-export function PapeleraView({ onBack, onEmptyTrash: onEmptyTrashProp }: PapeleraViewProps) {
+export function PapeleraView({ onBack, onEmptyTrash: onEmptyTrashProp, onReload }: PapeleraViewProps) {
   const [tasks, setTasks] = useState<Map<string, Tarea> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function PapeleraView({ onBack, onEmptyTrash: onEmptyTrashProp }: Papeler
     try {
       await restoreTask(filename);
       load();
+      onReload?.();
     } catch (e) {
       setError(String(e));
     }
@@ -63,6 +65,7 @@ export function PapeleraView({ onBack, onEmptyTrash: onEmptyTrashProp }: Papeler
     try {
       await restoreProject(proyecto);
       load();
+      onReload?.();
     } catch (e) {
       setError(String(e));
     }
