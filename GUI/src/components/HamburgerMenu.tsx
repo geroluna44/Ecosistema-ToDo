@@ -3,9 +3,11 @@ import '../styles/hamburger-menu.css';
 
 interface HamburgerMenuProps {
   onSelectPapelera: () => void;
+  debugMode: boolean;
+  onToggleDebug: () => void;
 }
 
-export function HamburgerMenu({ onSelectPapelera }: HamburgerMenuProps) {
+export function HamburgerMenu({ onSelectPapelera, debugMode, onToggleDebug }: HamburgerMenuProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,6 +43,14 @@ export function HamburgerMenu({ onSelectPapelera }: HamburgerMenuProps) {
             }}
           >
             Papelera
+          </button>
+          <button
+            className={`hamburger-item ${debugMode ? 'active' : ''}`}
+            onClick={() => {
+              onToggleDebug();
+            }}
+          >
+            {debugMode ? '● Modo Debug' : '○ Modo Debug'}
           </button>
         </div>
       )}

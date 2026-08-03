@@ -3,8 +3,27 @@ import { Tarea } from '../../types/task';
 import { AdvancedFilter, ClasificadasFilter, EMPTY_FILTER, applyFilter } from './AdvancedFilter';
 import { formatTaskDisplay } from '../../services/taskService';
 
-type SortColumn = 'id' | 'nombre' | 'proyecto' | 'descripcion' | 'urgencia' | 'padre' | 'hija' | 'deadline';
+type SortColumn = 'id' | 'nombre' | 'lugar' | 'proyecto' | 'descripcion' | 'primerPaso' | 'rangoTiempo' | 'postergaciones' | 'urgencia' | 'padre' | 'hija' | 'deadline';
 type SortDir = 'asc' | 'desc';
+
+const COLUMN_META: Record<SortColumn, { label: string }> = {
+  id:              { label: 'ID' },
+  nombre:          { label: 'Nombre' },
+  lugar:           { label: 'Lugar' },
+  proyecto:        { label: 'Proyecto' },
+  descripcion:     { label: 'Descripción' },
+  primerPaso:      { label: 'Primer paso' },
+  rangoTiempo:     { label: 'Rango tiempo' },
+  postergaciones:  { label: 'Postergaciones' },
+  urgencia:        { label: 'Urgencia' },
+  padre:           { label: 'Tarea Padre' },
+  hija:            { label: 'Tarea Hija' },
+  deadline:        { label: 'Deadline' },
+};
+
+const ALWAYS_VISIBLE: SortColumn[] = ['id', 'nombre'];
+const TOGGLEABLE_COLUMNS: SortColumn[] = ['lugar', 'proyecto', 'descripcion', 'primerPaso', 'rangoTiempo', 'postergaciones', 'urgencia', 'padre', 'hija', 'deadline'];
+const DEFAULT_VISIBLE: SortColumn[] = ['id', 'nombre', 'proyecto', 'descripcion', 'urgencia', 'padre', 'hija', 'deadline'];
 
 interface ClasificadasTableProps {
   tasks: Map<string, Tarea>;
@@ -47,10 +66,18 @@ function compareValue(a: Tarea, b: Tarea, column: SortColumn, tasks: Map<string,
       return 0;
     case 'nombre':
       return a.Nombre.localeCompare(b.Nombre);
+    case 'lugar':
+      return (a['Lugar de trabajo'] || '').localeCompare(b['Lugar de trabajo'] || '');
     case 'proyecto':
       return (a.Proyecto || '').localeCompare(b.Proyecto || '');
     case 'descripcion':
       return (a.Descripcion || '').localeCompare(b.Descripcion || '');
+    case 'primerPaso':
+      return (a['Primer paso'] || '').localeCompare(b['Primer paso'] || '');
+    case 'rangoTiempo':
+      return (a['Rango de tiempo'] || 0) - (b['Rango de tiempo'] || 0);
+    case 'postergaciones':
+      return (a.Postergaciones || 0) - (b.Postergaciones || 0);
     case 'urgencia': {
       const order = { A: 0, B: 1, C: 2 } as const;
       return (order[a.Urgencia] ?? 99) - (order[b.Urgencia] ?? 99);
@@ -94,6 +121,7 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
+  const [visibleColumns, setVisibleColumns] = useState<Set<SortColumn>>(() => new Set(DEFAULT_VISIBLE));
   const popupRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -142,6 +170,19 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
     setSelectedFilename(null);
     setPopupPosition(null);
     onToggleComplete(filename);
+  };
+
+  const toggleColumn = (col: SortColumn) => {
+    setVisibleColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) {
+        if (ALWAYS_VISIBLE.includes(col)) return prev;
+        next.delete(col);
+      } else {
+        next.add(col);
+      }
+      return next;
+    });
   };
 
   const handleSort = (col: SortColumn) => {
@@ -208,6 +249,17 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
           </div>
         </div>
       </div>
+      <div className="list-view-column-toggles">
+        {TOGGLEABLE_COLUMNS.map(col => (
+          <button
+            key={col}
+            className={`list-view-col-toggle ${visibleColumns.has(col) ? 'active' : ''}`}
+            onClick={() => toggleColumn(col)}
+          >
+            {COLUMN_META[col].label}
+          </button>
+        ))}
+      </div>
       <div className="list-view-table-wrap" ref={tableRef}>
         {filteredAndSorted.length === 0 ? (
           <div className="list-view-empty">Sin tareas para mostrar</div>
@@ -215,14 +267,12 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
           <table className="list-view-table">
             <thead>
               <tr>
-                <SortableTh column="id" label="ID" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="nombre" label="Nombre" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="proyecto" label="Proyecto" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="descripcion" label="Descripción" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="urgencia" label="Urgencia" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="padre" label="Tarea Padre" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="hija" label="Tarea Hija" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
-                <SortableTh column="deadline" label="Deadline" sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
+                {ALWAYS_VISIBLE.map(col => (
+                  <SortableTh key={col} column={col} label={COLUMN_META[col].label} sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
+                ))}
+                {TOGGLEABLE_COLUMNS.filter(col => visibleColumns.has(col)).map(col => (
+                  <SortableTh key={col} column={col} label={COLUMN_META[col].label} sortColumn={sortColumn} sortDir={sortDir} onSort={handleSort} />
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -239,18 +289,42 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
                   >
                     <td className="col-id" title={filename}>{filename}</td>
                     <td className="col-nombre" title={task.Nombre}>{task.Nombre || '—'}</td>
-                    <td className="col-proyecto" title={task.Proyecto}>{task.Proyecto || '—'}</td>
-                    <td className="col-descripcion">{task.Descripcion || '—'}</td>
-                    <td className="col-urgencia">
-                      <span className={`badge-urg urgency-${(task.Urgencia || 'c').toLowerCase()}`}>
-                        {task.Urgencia || '?'}
-                      </span>
-                    </td>
-                    <td className="col-rel" title={formatTaskDisplay(task['Tarea Padre'], tasks)}>{formatTaskDisplay(task['Tarea Padre'], tasks) || '—'}</td>
-                    <td className="col-rel" title={formatTaskDisplay(task['Tarea Hija'], tasks)}>{formatTaskDisplay(task['Tarea Hija'], tasks) || '—'}</td>
-                    <td className="col-deadline">
-                      <span className={`list-view-deadline-cell ${deadline.className}`}>{deadline.text}</span>
-                    </td>
+                    {visibleColumns.has('lugar') && (
+                      <td className="col-rel" title={task['Lugar de trabajo']}>{task['Lugar de trabajo'] || '—'}</td>
+                    )}
+                    {visibleColumns.has('proyecto') && (
+                      <td className="col-proyecto" title={task.Proyecto}>{task.Proyecto || '—'}</td>
+                    )}
+                    {visibleColumns.has('descripcion') && (
+                      <td className="col-descripcion">{task.Descripcion || '—'}</td>
+                    )}
+                    {visibleColumns.has('primerPaso') && (
+                      <td className="col-rel" title={task['Primer paso']}>{task['Primer paso'] || '—'}</td>
+                    )}
+                    {visibleColumns.has('rangoTiempo') && (
+                      <td className="col-num">{task['Rango de tiempo'] ?? '—'}</td>
+                    )}
+                    {visibleColumns.has('postergaciones') && (
+                      <td className="col-num">{task.Postergaciones ?? '—'}</td>
+                    )}
+                    {visibleColumns.has('urgencia') && (
+                      <td className="col-urgencia">
+                        <span className={`badge-urg urgency-${(task.Urgencia || 'c').toLowerCase()}`}>
+                          {task.Urgencia || '?'}
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.has('padre') && (
+                      <td className="col-rel" title={formatTaskDisplay(task['Tarea Padre'], tasks)}>{formatTaskDisplay(task['Tarea Padre'], tasks) || '—'}</td>
+                    )}
+                    {visibleColumns.has('hija') && (
+                      <td className="col-rel" title={formatTaskDisplay(task['Tarea Hija'], tasks)}>{formatTaskDisplay(task['Tarea Hija'], tasks) || '—'}</td>
+                    )}
+                    {visibleColumns.has('deadline') && (
+                      <td className="col-deadline">
+                        <span className={`list-view-deadline-cell ${deadline.className}`}>{deadline.text}</span>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

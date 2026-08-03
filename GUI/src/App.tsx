@@ -9,7 +9,7 @@ import { PapeleraView } from './components/PapeleraView';
 import { ListView } from './components/ListView/ListView';
 import { Tarea, Vista } from './types/task';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { deleteTask, trashProject, emptyTrash, updateConnection, removeConnection, restoreTask } from './services/taskService';
+import { deleteTask, trashProject, emptyTrash, updateConnection, removeConnection, restoreTask, setDebugMode } from './services/taskService';
 import './styles/zoom-controls.css';
 import './styles/quick-add-fab.css';
 import './styles/hamburger-menu.css';
@@ -39,6 +39,7 @@ function App() {
   const [modifyingNodeId, setModifyingNodeId] = useState<string | null>(null);
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [debugMode, setDebugModeState] = useState(false);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousViewRef = useRef<Vista>('lista');
   const sortRef = useRef<HTMLDivElement>(null);
@@ -225,6 +226,15 @@ function App() {
     setVistaActiva('papelera');
   }, [vistaActiva]);
 
+  const handleToggleDebug = useCallback(() => {
+    setDebugModeState(prev => {
+      const next = !prev;
+      setDebugMode(next);
+      reload();
+      return next;
+    });
+  }, [reload]);
+
   const handleModifyConnectionsChange = useCallback((nodeId: string | null) => {
     setModifyingNodeId(nodeId);
   }, []);
@@ -267,7 +277,8 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">Ecosistema ToDo</h1>
-        <HamburgerMenu onSelectPapelera={handleSelectPapelera} />
+        {debugMode && <span className="debug-badge">DEBUG</span>}
+        <HamburgerMenu onSelectPapelera={handleSelectPapelera} debugMode={debugMode} onToggleDebug={handleToggleDebug} />
       </header>
       
       <main className="app-main">

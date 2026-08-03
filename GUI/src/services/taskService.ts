@@ -37,6 +37,13 @@ interface TaskServerConfig {
   postTaskUrl: string;
   poolListUrl: string;
   clasificarPoolUrl: (filename: string) => string;
+  papeleraListUrl: string;
+  papeleraGetUrl: (filename: string) => string;
+  papeleraRestoreUrl: (filename: string) => string;
+  papeleraEmptyUrl: string;
+  papeleraDeleteUrl: (filename: string) => string;
+  taskDeleteUrl: (filename: string) => string;
+  taskDeleteProyectoUrl: (proyecto: string) => string;
 }
 
 const DEV_CONFIG: TaskServerConfig = {
@@ -47,6 +54,30 @@ const DEV_CONFIG: TaskServerConfig = {
   postTaskUrl: '/tareas/',
   poolListUrl: '/tareas/pool/',
   clasificarPoolUrl: (f: string) => `/tareas/pool/${f}/clasificar`,
+  papeleraListUrl: '/papelera/',
+  papeleraGetUrl: (f: string) => `/papelera/${f}`,
+  papeleraRestoreUrl: (f: string) => `/papelera/${f}/restore`,
+  papeleraEmptyUrl: '/papelera/',
+  papeleraDeleteUrl: (f: string) => `/papelera/${f}`,
+  taskDeleteUrl: (f: string) => `/tareas/${f}`,
+  taskDeleteProyectoUrl: (p: string) => `/tareas/?proyecto=${encodeURIComponent(p)}`,
+};
+
+const DEBUG_CONFIG: TaskServerConfig = {
+  listUrl: '/debug/',
+  getUrl: (f: string) => `/debug/${f}`,
+  putUrl: (f: string) => `/debug/${f}`,
+  postPoolUrl: '/debug/pool',
+  postTaskUrl: '/debug/',
+  poolListUrl: '/debug/pool/',
+  clasificarPoolUrl: (f: string) => `/debug/pool/${f}/clasificar`,
+  papeleraListUrl: '/debug-papelera/',
+  papeleraGetUrl: (f: string) => `/debug-papelera/${f}`,
+  papeleraRestoreUrl: (f: string) => `/debug-papelera/${f}/restore`,
+  papeleraEmptyUrl: '/debug-papelera/',
+  papeleraDeleteUrl: (f: string) => `/debug-papelera/${f}`,
+  taskDeleteUrl: (f: string) => `/debug/${f}`,
+  taskDeleteProyectoUrl: (p: string) => `/debug/?proyecto=${encodeURIComponent(p)}`,
 };
 
 const PROD_CONFIG: TaskServerConfig = {
@@ -57,14 +88,33 @@ const PROD_CONFIG: TaskServerConfig = {
   postTaskUrl: TASKS_DIR,
   poolListUrl: `${POOL_DIR}/`,
   clasificarPoolUrl: (f: string) => `${POOL_DIR}/${f}/clasificar`,
+  papeleraListUrl: PAPELERA_DIR,
+  papeleraGetUrl: (f: string) => `${PAPELERA_DIR}/${f}`,
+  papeleraRestoreUrl: (f: string) => `${PAPELERA_DIR}/${f}/restore`,
+  papeleraEmptyUrl: PAPELERA_DIR,
+  papeleraDeleteUrl: (f: string) => `${PAPELERA_DIR}/${f}`,
+  taskDeleteUrl: (f: string) => `${TASKS_DIR}/${f}`,
+  taskDeleteProyectoUrl: (p: string) => `${TASKS_DIR}/?proyecto=${encodeURIComponent(p)}`,
 };
 
 const isDevelopment = import.meta.env.DEV;
 
 let serverConfig = isDevelopment ? DEV_CONFIG : PROD_CONFIG;
+let isDebugMode = false;
 
 export function configureTaskServer(config: Partial<TaskServerConfig>) {
   serverConfig = { ...serverConfig, ...config };
+}
+
+export function setDebugMode(enabled: boolean) {
+  isDebugMode = enabled;
+  if (isDevelopment) {
+    serverConfig = enabled ? DEBUG_CONFIG : DEV_CONFIG;
+  }
+}
+
+export function getDebugMode(): boolean {
+  return isDebugMode;
 }
 
 export async function readTasks(): Promise<Map<string, Tarea>> {
@@ -176,7 +226,7 @@ export async function createPoolTask(input: PoolTaskInput): Promise<{ filename: 
 
 export async function readPapeleraTasks(): Promise<Map<string, Tarea>> {
   const tasks = new Map<string, Tarea>();
-  const url = isDevelopment ? '/papelera/' : PAPELERA_DIR;
+  const url = isDevelopment ? serverConfig.papeleraListUrl : PAPELERA_DIR;
 
   try {
     const response = await fetch(url);
@@ -196,7 +246,7 @@ export async function readPapeleraTasks(): Promise<Map<string, Tarea>> {
     const fileContents = await Promise.all(
       filenames.map(async (filename) => {
         try {
-          const fileUrl = isDevelopment ? `/papelera/${filename}` : `${PAPELERA_DIR}/${filename}`;
+          const fileUrl = isDevelopment ? serverConfig.papeleraGetUrl(filename) : `${PAPELERA_DIR}/${filename}`;
           const fileResponse = await fetch(fileUrl);
           if (fileResponse.ok) {
             return { filename, task: await fileResponse.json() as Tarea };
@@ -222,7 +272,7 @@ export async function readPapeleraTasks(): Promise<Map<string, Tarea>> {
 }
 
 export async function restoreTask(filename: string): Promise<void> {
-  const url = isDevelopment ? `/papelera/${filename}/restore` : `${PAPELERA_DIR}/${filename}/restore`;
+  const url = isDevelopment ? serverConfig.papeleraRestoreUrl(filename) : `${PAPELERA_DIR}/${filename}/restore`;
   const response = await fetch(url, { method: 'POST' });
 
   if (!response.ok) {
@@ -260,7 +310,7 @@ export async function createClasificadaTask(input: ClasificadaTaskInput): Promis
 
 export async function deleteTask(filename: string): Promise<void> {
   if (isDevelopment) {
-    const response = await fetch(`/tareas/${filename}`, { method: 'DELETE' });
+    const response = await fetch(serverConfig.taskDeleteUrl(filename), { method: 'DELETE' });
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Failed to delete ${filename}: ${err}`);
@@ -272,7 +322,7 @@ export async function deleteTask(filename: string): Promise<void> {
 
 export async function trashProject(proyecto: string): Promise<void> {
   if (isDevelopment) {
-    const response = await fetch(`/tareas/?proyecto=${encodeURIComponent(proyecto)}`, { method: 'DELETE' });
+    const response = await fetch(serverConfig.taskDeleteProyectoUrl(proyecto), { method: 'DELETE' });
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Failed to trash project: ${err}`);
@@ -284,7 +334,7 @@ export async function trashProject(proyecto: string): Promise<void> {
 
 export async function emptyTrash(): Promise<void> {
   if (isDevelopment) {
-    const response = await fetch('/papelera/', { method: 'DELETE' });
+    const response = await fetch(serverConfig.papeleraEmptyUrl, { method: 'DELETE' });
     if (!response.ok) {
       const err = await response.text();
       throw new Error(`Failed to empty trash: ${err}`);
