@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
-import { PoolTask } from '../../types/task';
+import { useState, useEffect, useMemo } from 'react';
+import { Tarea, PoolTask } from '../../types/task';
 import { clasificarPoolTask, ClasificarPoolInput } from '../../services/taskService';
+import { TaskReferenceInput } from '../TaskReferenceInput';
+import { SuggestionInput } from '../SuggestionInput';
 
 interface ClasificarTaskFormProps {
   poolTask: PoolTask;
+  tasks: Map<string, Tarea>;
   onClose: () => void;
   onClasificado: () => void;
 }
 
-export function ClasificarTaskForm({ poolTask, onClose, onClasificado }: ClasificarTaskFormProps) {
+export function ClasificarTaskForm({ poolTask, tasks, onClose, onClasificado }: ClasificarTaskFormProps) {
   const [proyecto, setProyecto] = useState('');
   const [lugar, setLugar] = useState('');
   const [descripcion, setDescripcion] = useState(poolTask.descripcion);
@@ -20,6 +23,18 @@ export function ClasificarTaskForm({ poolTask, onClose, onClasificado }: Clasifi
   const [tareaHija, setTareaHija] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const proyectos = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => { if (t.Proyecto) set.add(t.Proyecto); });
+    return Array.from(set).sort();
+  }, [tasks]);
+
+  const lugares = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => { if (t['Lugar de trabajo']) set.add(t['Lugar de trabajo']); });
+    return Array.from(set).sort();
+  }, [tasks]);
 
   useEffect(() => {
     setDescripcion(poolTask.descripcion);
@@ -66,24 +81,20 @@ export function ClasificarTaskForm({ poolTask, onClose, onClasificado }: Clasifi
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label>Proyecto</label>
-              <input
-                type="text"
-                value={proyecto}
-                onChange={e => setProyecto(e.target.value)}
-                placeholder="Opcional"
-              />
-            </div>
-            <div className="form-group">
-              <label>Lugar de trabajo</label>
-              <input
-                type="text"
-                value={lugar}
-                onChange={e => setLugar(e.target.value)}
-                placeholder="Opcional"
-              />
-            </div>
+            <SuggestionInput
+              label="Proyecto"
+              value={proyecto}
+              suggestions={proyectos}
+              onChange={setProyecto}
+              placeholder="Opcional"
+            />
+            <SuggestionInput
+              label="Lugar de trabajo"
+              value={lugar}
+              suggestions={lugares}
+              onChange={setLugar}
+              placeholder="Opcional"
+            />
           </div>
 
           <div className="form-group">
@@ -139,24 +150,20 @@ export function ClasificarTaskForm({ poolTask, onClose, onClasificado }: Clasifi
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label>Tarea Padre</label>
-              <input
-                type="text"
-                value={tareaPadre}
-                onChange={e => setTareaPadre(e.target.value)}
-                placeholder="filename.json"
-              />
-            </div>
-            <div className="form-group">
-              <label>Tarea Hija</label>
-              <input
-                type="text"
-                value={tareaHija}
-                onChange={e => setTareaHija(e.target.value)}
-                placeholder="filename.json"
-              />
-            </div>
+            <TaskReferenceInput
+              label="Tarea Padre"
+              value={tareaPadre}
+              tasks={tasks}
+              onChange={setTareaPadre}
+              placeholder="Escribir nombre..."
+            />
+            <TaskReferenceInput
+              label="Tarea Hija"
+              value={tareaHija}
+              tasks={tasks}
+              onChange={setTareaHija}
+              placeholder="Escribir nombre..."
+            />
           </div>
 
           {error && <div className="form-error">{error}</div>}

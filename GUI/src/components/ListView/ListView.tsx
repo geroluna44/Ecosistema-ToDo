@@ -10,6 +10,8 @@ interface ListViewProps {
   tasks: Map<string, Tarea>;
   poolTasks: Map<string, PoolTask>;
   onEdit: (filename: string) => void;
+  onTrash: (filename: string) => void;
+  onToggleComplete: (filename: string) => void;
   onReload: () => void;
 }
 
@@ -23,7 +25,7 @@ const MODE_LABELS: Record<ListMode, string> = {
   both: 'Clasificadas + Pool',
 };
 
-export function ListView({ tasks, poolTasks, onEdit, onReload }: ListViewProps) {
+export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, onReload }: ListViewProps) {
   const [mode, setMode] = useState<ListMode>('clasificadas');
   const [modeOpen, setModeOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -50,7 +52,7 @@ export function ListView({ tasks, poolTasks, onEdit, onReload }: ListViewProps) 
 
   const renderClasificadas = () => (
     <div className="list-view-pane">
-      <ClasificadasTable tasks={tasks} onEdit={onEdit} />
+      <ClasificadasTable tasks={tasks} onEdit={onEdit} onTrash={onTrash} onToggleComplete={onToggleComplete} />
     </div>
   );
 
@@ -111,6 +113,7 @@ export function ListView({ tasks, poolTasks, onEdit, onReload }: ListViewProps) 
       {clasificarTarget && (
         <ClasificarTaskForm
           poolTask={clasificarTarget}
+          tasks={tasks}
           onClose={() => setClasificarTarget(null)}
           onClasificado={() => {
             setClasificarTarget(null);

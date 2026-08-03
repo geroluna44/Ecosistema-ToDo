@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Tarea } from '../../types/task';
 import { AdvancedFilter, ClasificadasFilter, EMPTY_FILTER, applyFilter } from './AdvancedFilter';
+import { formatTaskDisplay } from '../../services/taskService';
 
 type SortColumn = 'id' | 'nombre' | 'proyecto' | 'descripcion' | 'urgencia' | 'padre' | 'hija' | 'deadline';
 type SortDir = 'asc' | 'desc';
@@ -8,6 +9,8 @@ type SortDir = 'asc' | 'desc';
 interface ClasificadasTableProps {
   tasks: Map<string, Tarea>;
   onEdit: (filename: string) => void;
+  onTrash: (filename: string) => void;
+  onToggleComplete: (filename: string) => void;
 }
 
 function formatDeadline(value: number | undefined): { text: string; className: string } {
@@ -38,7 +41,7 @@ function formatDeadline(value: number | undefined): { text: string; className: s
   };
 }
 
-function compareValue(a: Tarea, b: Tarea, column: SortColumn): number {
+function compareValue(a: Tarea, b: Tarea, column: SortColumn, tasks: Map<string, Tarea>): number {
   switch (column) {
     case 'id':
       return 0;
@@ -53,9 +56,9 @@ function compareValue(a: Tarea, b: Tarea, column: SortColumn): number {
       return (order[a.Urgencia] ?? 99) - (order[b.Urgencia] ?? 99);
     }
     case 'padre':
-      return (a['Tarea Padre'] || '').localeCompare(b['Tarea Padre'] || '');
+      return formatTaskDisplay(a['Tarea Padre'] || '', tasks).localeCompare(formatTaskDisplay(b['Tarea Padre'] || '', tasks));
     case 'hija':
-      return (a['Tarea Hija'] || '').localeCompare(b['Tarea Hija'] || '');
+      return formatTaskDisplay(a['Tarea Hija'] || '', tasks).localeCompare(formatTaskDisplay(b['Tarea Hija'] || '', tasks));
     case 'deadline':
       return (a.Deadline || 0) - (b.Deadline || 0);
   }
@@ -84,11 +87,62 @@ function SortableTh({
   );
 }
 
-export function ClasificadasTable({ tasks, onEdit }: ClasificadasTableProps) {
+export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: ClasificadasTableProps) {
   const [sortColumn, setSortColumn] = useState<SortColumn>('urgencia');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filter, setFilter] = useState<ClasificadasFilter>(EMPTY_FILTER);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selectedFilename) return;
+    const handleClick = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setSelectedFilename(null);
+        setPopupPosition(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [selectedFilename]);
+
+  const handleRowClick = (filename: string, e: React.MouseEvent<HTMLTableRowElement>) => {
+    if (selectedFilename === filename) {
+      setSelectedFilename(null);
+      setPopupPosition(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const containerRect = tableRef.current?.getBoundingClientRect();
+    if (containerRect) {
+      setPopupPosition({
+        top: rect.top - containerRect.top + rect.height / 2,
+        left: rect.left - containerRect.left + rect.width / 2,
+      });
+    }
+    setSelectedFilename(filename);
+  };
+
+  const handleTrash = (filename: string) => {
+    setSelectedFilename(null);
+    setPopupPosition(null);
+    onTrash(filename);
+  };
+
+  const handleEdit = (filename: string) => {
+    setSelectedFilename(null);
+    setPopupPosition(null);
+    onEdit(filename);
+  };
+
+  const handleToggleComplete = (filename: string) => {
+    setSelectedFilename(null);
+    setPopupPosition(null);
+    onToggleComplete(filename);
+  };
 
   const handleSort = (col: SortColumn) => {
     if (sortColumn === col) {
@@ -101,12 +155,12 @@ export function ClasificadasTable({ tasks, onEdit }: ClasificadasTableProps) {
 
   const filteredAndSorted = useMemo(() => {
     const arr = Array.from(tasks.entries());
-    const filtered = applyFilter(arr, filter);
+    const filtered = applyFilter(arr, filter, tasks);
     if (sortColumn === 'id') {
       filtered.sort((a, b) => sortDir === 'asc' ? a[0].localeCompare(b[0]) : b[0].localeCompare(a[0]));
     } else {
       filtered.sort((a, b) => {
-        const cmp = compareValue(a[1], b[1], sortColumn);
+        const cmp = compareValue(a[1], b[1], sortColumn, tasks);
         return sortDir === 'asc' ? cmp : -cmp;
       });
     }
@@ -154,7 +208,7 @@ export function ClasificadasTable({ tasks, onEdit }: ClasificadasTableProps) {
           </div>
         </div>
       </div>
-      <div className="list-view-table-wrap">
+      <div className="list-view-table-wrap" ref={tableRef}>
         {filteredAndSorted.length === 0 ? (
           <div className="list-view-empty">Sin tareas para mostrar</div>
         ) : (
@@ -175,7 +229,11 @@ export function ClasificadasTable({ tasks, onEdit }: ClasificadasTableProps) {
               {filteredAndSorted.map(([filename, task]) => {
                 const deadline = formatDeadline(task.Deadline);
                 return (
-                  <tr key={filename} onClick={() => onEdit(filename)}>
+                  <tr
+                    key={filename}
+                    onClick={(e) => handleRowClick(filename, e)}
+                    className={selectedFilename === filename ? 'selected' : ''}
+                  >
                     <td className="col-id" title={filename}>{filename}</td>
                     <td className="col-nombre" title={task.Nombre}>{task.Nombre || '—'}</td>
                     <td className="col-proyecto" title={task.Proyecto}>{task.Proyecto || '—'}</td>
@@ -185,8 +243,8 @@ export function ClasificadasTable({ tasks, onEdit }: ClasificadasTableProps) {
                         {task.Urgencia || '?'}
                       </span>
                     </td>
-                    <td className="col-rel" title={task['Tarea Padre']}>{task['Tarea Padre'] || '—'}</td>
-                    <td className="col-rel" title={task['Tarea Hija']}>{task['Tarea Hija'] || '—'}</td>
+                    <td className="col-rel" title={formatTaskDisplay(task['Tarea Padre'], tasks)}>{formatTaskDisplay(task['Tarea Padre'], tasks) || '—'}</td>
+                    <td className="col-rel" title={formatTaskDisplay(task['Tarea Hija'], tasks)}>{formatTaskDisplay(task['Tarea Hija'], tasks) || '—'}</td>
                     <td className="col-deadline">
                       <span className={`list-view-deadline-cell ${deadline.className}`}>{deadline.text}</span>
                     </td>
@@ -195,6 +253,35 @@ export function ClasificadasTable({ tasks, onEdit }: ClasificadasTableProps) {
               })}
             </tbody>
           </table>
+        )}
+        {selectedFilename && popupPosition && (
+          <div
+            ref={popupRef}
+            className="row-action-popup"
+            style={{ top: popupPosition.top, left: popupPosition.left }}
+          >
+            <button
+              className="row-action-btn trash"
+              onClick={(e) => { e.stopPropagation(); handleTrash(selectedFilename); }}
+              title="Enviar a papelera"
+            >
+              🗑
+            </button>
+            <button
+              className={`row-action-btn complete ${tasks.get(selectedFilename)?.completado ? 'completed' : ''}`}
+              onClick={(e) => { e.stopPropagation(); handleToggleComplete(selectedFilename); }}
+              title={tasks.get(selectedFilename)?.completado ? 'Desmarcar realizada' : 'Marcar como realizada'}
+            >
+              ✓
+            </button>
+            <button
+              className="row-action-btn edit"
+              onClick={(e) => { e.stopPropagation(); handleEdit(selectedFilename); }}
+              title="Editar tarea"
+            >
+              ✏
+            </button>
+          </div>
         )}
       </div>
     </>

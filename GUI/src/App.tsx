@@ -9,7 +9,7 @@ import { PapeleraView } from './components/PapeleraView';
 import { ListView } from './components/ListView/ListView';
 import { Tarea, Vista } from './types/task';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { deleteTask, trashProject, emptyTrash, updateConnection, removeConnection } from './services/taskService';
+import { deleteTask, trashProject, emptyTrash, updateConnection, removeConnection, restoreTask } from './services/taskService';
 import './styles/zoom-controls.css';
 import './styles/quick-add-fab.css';
 import './styles/hamburger-menu.css';
@@ -17,6 +17,11 @@ import './styles/papelera-view.css';
 
 function clamp(val: number, min: number, max: number) {
   return Math.min(Math.max(val, min), max);
+}
+
+interface UndoToast {
+  filename: string;
+  nombre: string;
 }
 
 function App() {
@@ -32,10 +37,20 @@ function App() {
   const [sortOpen, setSortOpen] = useState(false);
   const [connectionMode, setConnectionMode] = useState('proyecto');
   const [modifyingNodeId, setModifyingNodeId] = useState<string | null>(null);
+  const [undoToast, setUndoToast] = useState<UndoToast | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousViewRef = useRef<Vista>('lista');
   const sortRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const panStart = useRef({ x: 0, y: 0 });
   const viewportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    };
+  }, []);
 
   const skillTreeData = useMemo(() => {
     return buildSkillTree(tasks);
@@ -45,7 +60,8 @@ function App() {
     try {
       await toggleComplete(filename);
     } catch (e) {
-      console.error('Error toggling task:', e);
+      setActionError(`No se pudo cambiar el estado: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
     }
   };
 
@@ -54,13 +70,32 @@ function App() {
   }, []);
 
   const handleTrashTask = useCallback(async (filename: string) => {
+    const task = tasks.get(filename);
+    const nombre = task?.Nombre || filename;
     try {
       await deleteTask(filename);
       reload();
+      setUndoToast({ filename, nombre });
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = setTimeout(() => setUndoToast(null), 5000);
     } catch (e) {
-      console.error('Error moving task to trash:', e);
+      setActionError(`No se pudo enviar "${nombre}" a la papelera: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
     }
-  }, [reload]);
+  }, [tasks, reload]);
+
+  const handleUndoTrash = useCallback(async () => {
+    if (!undoToast) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    try {
+      await restoreTask(undoToast.filename);
+      reload();
+    } catch (e) {
+      setActionError(`No se pudo restaurar: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
+    }
+    setUndoToast(null);
+  }, [undoToast, reload]);
 
   const handleTrashProject = useCallback(async (proyecto: string) => {
     if (!confirm(`¿Mover todo el proyecto "${proyecto}" a la papelera?`)) return;
@@ -68,7 +103,8 @@ function App() {
       await trashProject(proyecto);
       reload();
     } catch (e) {
-      console.error('Error trashing project:', e);
+      setActionError(`No se pudo enviar el proyecto "${proyecto}" a la papelera: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
     }
   }, [reload]);
 
@@ -77,7 +113,8 @@ function App() {
       await updateConnection(childId, parentId, tasks);
       reload();
     } catch (e) {
-      console.error('Error updating connection:', e);
+      setActionError(`No se pudo conectar las tareas: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
     }
   }, [tasks, reload]);
 
@@ -86,7 +123,8 @@ function App() {
       await removeConnection(childId, tasks);
       reload();
     } catch (e) {
-      console.error('Error removing connection:', e);
+      setActionError(`No se pudo desconectar la tarea: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
     }
   }, [tasks, reload]);
 
@@ -95,7 +133,8 @@ function App() {
       await emptyTrash();
       reload();
     } catch (e) {
-      console.error('Error emptying trash:', e);
+      setActionError(`No se pudo vaciar la papelera: ${e instanceof Error ? e.message : e}`);
+      setTimeout(() => setActionError(null), 5000);
     }
   }, [reload]);
 
@@ -182,8 +221,9 @@ function App() {
   }, []);
 
   const handleSelectPapelera = useCallback(() => {
+    previousViewRef.current = vistaActiva;
     setVistaActiva('papelera');
-  }, []);
+  }, [vistaActiva]);
 
   const handleModifyConnectionsChange = useCallback((nodeId: string | null) => {
     setModifyingNodeId(nodeId);
@@ -237,7 +277,7 @@ function App() {
             {vistaActiva === 'arbol' && (
               <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onZoomReset={zoomReset} onPanBy={panBy} onPanHome={panHome} />
             )}
-            <QuickAddFAB />
+            <QuickAddFAB tasks={tasks} />
           </>
         )}
 
@@ -245,11 +285,21 @@ function App() {
 
         {error && <div className="error">Error: {error}</div>}
 
+        {actionError && <div className="error">{actionError}</div>}
+
+        {undoToast && vistaActiva === 'lista' && (
+          <div className="app-undo-toast" onClick={handleUndoTrash}>
+            Descartado. <span>Click para deshacer</span>
+          </div>
+        )}
+
         {!loading && !error && vistaActiva === 'lista' && (
           <ListView
             tasks={tasks}
             poolTasks={poolTasks}
             onEdit={handleEditTask}
+            onTrash={handleTrashTask}
+            onToggleComplete={handleToggleComplete}
             onReload={reload}
           />
         )}
@@ -308,7 +358,7 @@ function App() {
         )}
 
         {vistaActiva === 'papelera' && (
-          <PapeleraView onBack={() => setVistaActiva('arbol')} onEmptyTrash={handleEmptyTrash} />
+          <PapeleraView onBack={() => setVistaActiva(previousViewRef.current)} onEmptyTrash={handleEmptyTrash} />
         )}
       </main>
 
@@ -316,6 +366,7 @@ function App() {
         <EditTaskForm
           filename={editingFilename}
           task={editingTask}
+          tasks={tasks}
           onClose={handleCloseEdit}
           onSaved={handleTaskSaved}
         />

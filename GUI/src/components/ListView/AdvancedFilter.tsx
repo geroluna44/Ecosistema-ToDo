@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Tarea, Urgencia } from '../../types/task';
+import { formatTaskDisplay } from '../../services/taskService';
 
 export interface ClasificadasFilter {
   proyecto: string;
@@ -173,7 +174,7 @@ export function AdvancedFilter({ filter, onApply, onClose }: AdvancedFilterProps
   );
 }
 
-export function applyFilter(tasks: Array<[string, Tarea]>, filter: ClasificadasFilter): Array<[string, Tarea]> {
+export function applyFilter(tasks: Array<[string, Tarea]>, filter: ClasificadasFilter, allTasks: Map<string, Tarea>): Array<[string, Tarea]> {
   const contains = (value: string | number | undefined, needle: string) => {
     if (!needle) return true;
     if (value === undefined || value === null) return false;
@@ -188,8 +189,8 @@ export function applyFilter(tasks: Array<[string, Tarea]>, filter: ClasificadasF
     if (!contains(task.Nombre, filter.nombre)) return false;
     if (!contains(task.Descripcion, filter.descripcion)) return false;
     if (!contains(task['Lugar de trabajo'], filter.lugar)) return false;
-    if (!contains(task['Tarea Padre'], filter.padre)) return false;
-    if (!contains(task['Tarea Hija'], filter.hija)) return false;
+    if (!contains(formatTaskDisplay(task['Tarea Padre'], allTasks), filter.padre)) return false;
+    if (!contains(formatTaskDisplay(task['Tarea Hija'], allTasks), filter.hija)) return false;
     if (filter.urgencia && task.Urgencia !== filter.urgencia) return false;
     if (minN !== null && (!task.Deadline || task.Deadline < minN)) return false;
     if (maxN !== null && (!task.Deadline || task.Deadline > maxN)) return false;

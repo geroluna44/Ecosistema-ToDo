@@ -10,7 +10,12 @@ export default defineConfig({
       '/tareas': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/tareas/, ''),
+        rewrite: (path) => {
+          if (path.startsWith('/tareas/') && path.endsWith('.json')) {
+            return path.replace(/^\//, '');
+          }
+          return path.replace(/^\/tareas/, '');
+        },
       },
       '/papelera': {
         target: 'http://localhost:8080',

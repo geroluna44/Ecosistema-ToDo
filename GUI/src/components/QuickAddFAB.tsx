@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createPoolTask, createClasificadaTask, ClasificadaTaskInput } from '../services/taskService';
+import { TaskReferenceInput } from './TaskReferenceInput';
+import { SuggestionInput } from './SuggestionInput';
+import { Tarea } from '../types/task';
 
 type MenuState = 'closed' | 'menu' | 'add' | 'quick';
 
-export function QuickAddFAB() {
+interface QuickAddFABProps {
+  tasks: Map<string, Tarea>;
+}
+
+export function QuickAddFAB({ tasks }: QuickAddFABProps) {
   const [menuState, setMenuState] = useState<MenuState>('closed');
 
   const handleToggle = () => {
@@ -16,7 +23,7 @@ export function QuickAddFAB() {
         <AddTaskForm onClose={() => setMenuState('closed')} />
       )}
       {menuState === 'quick' && (
-        <QuickTaskForm onClose={() => setMenuState('closed')} />
+        <QuickTaskForm tasks={tasks} onClose={() => setMenuState('closed')} />
       )}
       <div className={`quick-add-fab ${menuState !== 'closed' ? 'active' : ''}`}>
         <button
@@ -117,7 +124,7 @@ function AddTaskForm({ onClose }: { onClose: () => void }) {
   );
 }
 
-function QuickTaskForm({ onClose }: { onClose: () => void }) {
+function QuickTaskForm({ tasks, onClose }: { tasks: Map<string, Tarea>; onClose: () => void }) {
   const [formData, setFormData] = useState<ClasificadaTaskInput>({
     nombre: '',
     lugar: '',
@@ -132,6 +139,18 @@ function QuickTaskForm({ onClose }: { onClose: () => void }) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const proyectos = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => { if (t.Proyecto) set.add(t.Proyecto); });
+    return Array.from(set).sort();
+  }, [tasks]);
+
+  const lugares = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => { if (t['Lugar de trabajo']) set.add(t['Lugar de trabajo']); });
+    return Array.from(set).sort();
+  }, [tasks]);
 
   const handleChange = (field: keyof ClasificadaTaskInput, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -185,15 +204,14 @@ function QuickTaskForm({ onClose }: { onClose: () => void }) {
                 required
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="quick-proyecto">Proyecto</label>
-              <input
-                id="quick-proyecto"
-                type="text"
-                value={formData.proyecto}
-                onChange={e => handleChange('proyecto', e.target.value)}
-              />
-            </div>
+            <SuggestionInput
+              id="quick-proyecto"
+              label="Proyecto"
+              value={formData.proyecto}
+              suggestions={proyectos}
+              onChange={val => handleChange('proyecto', val)}
+              placeholder="Escribir..."
+            />
           </div>
 
           <div className="form-group">
@@ -217,15 +235,14 @@ function QuickTaskForm({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="quick-lugar">Lugar</label>
-              <input
-                id="quick-lugar"
-                type="text"
-                value={formData.lugar}
-                onChange={e => handleChange('lugar', e.target.value)}
-              />
-            </div>
+            <SuggestionInput
+              id="quick-lugar"
+              label="Lugar"
+              value={formData.lugar}
+              suggestions={lugares}
+              onChange={val => handleChange('lugar', val)}
+              placeholder="Escribir..."
+            />
             <div className="form-group">
               <label htmlFor="quick-rango">Tiempo (min)</label>
               <input
@@ -264,26 +281,22 @@ function QuickTaskForm({ onClose }: { onClose: () => void }) {
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="quick-padre">Tarea Padre</label>
-              <input
-                id="quick-padre"
-                type="text"
-                value={formData.tarea_padre}
-                onChange={e => handleChange('tarea_padre', e.target.value)}
-                placeholder="nombre.json"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="quick-hija">Tarea Hija</label>
-              <input
-                id="quick-hija"
-                type="text"
-                value={formData.tarea_hija}
-                onChange={e => handleChange('tarea_hija', e.target.value)}
-                placeholder="nombre.json"
-              />
-            </div>
+            <TaskReferenceInput
+              id="quick-padre"
+              label="Tarea Padre"
+              value={formData.tarea_padre}
+              tasks={tasks}
+              onChange={id => handleChange('tarea_padre', id)}
+              placeholder="Escribir nombre..."
+            />
+            <TaskReferenceInput
+              id="quick-hija"
+              label="Tarea Hija"
+              value={formData.tarea_hija}
+              tasks={tasks}
+              onChange={id => handleChange('tarea_hija', id)}
+              placeholder="Escribir nombre..."
+            />
           </div>
 
           {error && <div className="form-error">{error}</div>}

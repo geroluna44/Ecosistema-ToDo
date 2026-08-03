@@ -1,18 +1,33 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Tarea, Urgencia } from '../types/task';
 import { writeTask } from '../services/taskService';
+import { TaskReferenceInput } from './TaskReferenceInput';
+import { SuggestionInput } from './SuggestionInput';
 
 interface EditTaskFormProps {
   filename: string;
   task: Tarea;
+  tasks: Map<string, Tarea>;
   onClose: () => void;
   onSaved: (filename: string, updated: Tarea) => void;
 }
 
-export function EditTaskForm({ filename, task, onClose, onSaved }: EditTaskFormProps) {
+export function EditTaskForm({ filename, task, tasks, onClose, onSaved }: EditTaskFormProps) {
   const [formData, setFormData] = useState<Tarea>({ ...task });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const proyectos = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => { if (t.Proyecto) set.add(t.Proyecto); });
+    return Array.from(set).sort();
+  }, [tasks]);
+
+  const lugares = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => { if (t['Lugar de trabajo']) set.add(t['Lugar de trabajo']); });
+    return Array.from(set).sort();
+  }, [tasks]);
 
   const handleChange = (field: keyof Tarea, value: string | number | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -55,15 +70,14 @@ export function EditTaskForm({ filename, task, onClose, onSaved }: EditTaskFormP
                 required
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="edit-proyecto">Proyecto</label>
-              <input
-                id="edit-proyecto"
-                type="text"
-                value={formData.Proyecto}
-                onChange={e => handleChange('Proyecto', e.target.value)}
-              />
-            </div>
+            <SuggestionInput
+              id="edit-proyecto"
+              label="Proyecto"
+              value={formData.Proyecto}
+              suggestions={proyectos}
+              onChange={val => handleChange('Proyecto', val)}
+              placeholder="Escribir..."
+            />
           </div>
 
           <div className="form-group">
@@ -87,15 +101,14 @@ export function EditTaskForm({ filename, task, onClose, onSaved }: EditTaskFormP
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="edit-lugar">Lugar de trabajo</label>
-              <input
-                id="edit-lugar"
-                type="text"
-                value={formData['Lugar de trabajo']}
-                onChange={e => handleChange('Lugar de trabajo', e.target.value)}
-              />
-            </div>
+            <SuggestionInput
+              id="edit-lugar"
+              label="Lugar de trabajo"
+              value={formData['Lugar de trabajo']}
+              suggestions={lugares}
+              onChange={val => handleChange('Lugar de trabajo', val)}
+              placeholder="Escribir..."
+            />
             <div className="form-group">
               <label htmlFor="edit-rango">Tiempo (min)</label>
               <input
@@ -134,26 +147,22 @@ export function EditTaskForm({ filename, task, onClose, onSaved }: EditTaskFormP
           </div>
 
           <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="edit-padre">Tarea Padre</label>
-              <input
-                id="edit-padre"
-                type="text"
-                value={formData['Tarea Padre']}
-                onChange={e => handleChange('Tarea Padre', e.target.value)}
-                placeholder="nombre.json"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="edit-hija">Tarea Hija</label>
-              <input
-                id="edit-hija"
-                type="text"
-                value={formData['Tarea Hija']}
-                onChange={e => handleChange('Tarea Hija', e.target.value)}
-                placeholder="nombre.json"
-              />
-            </div>
+            <TaskReferenceInput
+              id="edit-padre"
+              label="Tarea Padre"
+              value={formData['Tarea Padre']}
+              tasks={tasks}
+              onChange={id => handleChange('Tarea Padre', id)}
+              placeholder="Escribir nombre..."
+            />
+            <TaskReferenceInput
+              id="edit-hija"
+              label="Tarea Hija"
+              value={formData['Tarea Hija']}
+              tasks={tasks}
+              onChange={id => handleChange('Tarea Hija', id)}
+              placeholder="Escribir nombre..."
+            />
           </div>
 
           <div className="form-group">

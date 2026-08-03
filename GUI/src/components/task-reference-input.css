@@ -1,0 +1,137 @@
+.task-ref-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+}
+
+.task-ref-container label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.task-ref-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 12px;
+  background-color: var(--bg-main);
+  border: 1px solid var(--bg-hover);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: border-color 0.15s ease;
+  min-height: 38px;
+}
+
+.task-ref-input-wrap:focus-within {
+  border-color: var(--state-available);
+}
+
+.task-ref-selected {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.task-ref-selected-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.task-ref-selected .task-ref-id {
+  color: var(--text-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.task-ref-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.task-ref-clear:hover {
+  color: var(--text-primary);
+}
+
+.task-ref-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  min-width: 60px;
+}
+
+.task-ref-input::placeholder {
+  color: var(--text-muted);
+}
+
+.task-ref-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--bg-hover);
+  border-radius: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  z-index: 100;
+  list-style: none;
+  margin: 4px 0 0 0;
+  padding: 4px 0;
+}
+
+.task-ref-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.task-ref-option:hover,
+.task-ref-option.highlighted {
+  background: var(--bg-hover);
+}
+
+.task-ref-option.selected {
+  background: var(--bg-selection);
+}
+
+.task-ref-option-name {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-ref-option-id {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}

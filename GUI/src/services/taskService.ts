@@ -1,5 +1,30 @@
 import { Tarea, PoolTask } from '../types/task';
 
+export function resolveTaskName(id: string, tasks: Map<string, Tarea>): string {
+  if (!id) return '';
+  const task = tasks.get(id);
+  if (!task) return id;
+  return `${task.Nombre} (${id})`;
+}
+
+export function resolveTaskId(displayName: string, tasks: Map<string, Tarea>): string {
+  if (!displayName) return '';
+  const trimmed = displayName.trim();
+  const idMatch = trimmed.match(/\((\d{14}\.json)\)$/);
+  if (idMatch) return idMatch[1];
+  for (const [id, task] of tasks) {
+    if (task.Nombre.toLowerCase() === trimmed.toLowerCase()) return id;
+  }
+  return '';
+}
+
+export function formatTaskDisplay(id: string, tasks: Map<string, Tarea>): string {
+  if (!id) return '';
+  const task = tasks.get(id);
+  if (!task) return id;
+  return `${task.Nombre} (${id})`;
+}
+
 const TASKS_DIR = '/home/gero/tareas/clasificadas';
 const POOL_DIR = '/home/gero/tareas/pool';
 const PAPELERA_DIR = '/home/gero/tareas/papelera';

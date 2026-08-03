@@ -30,6 +30,12 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         elif path.startswith("/pool/"):
             relative = path[len("/pool/"):]
             self.handle_pool_get(relative)
+        elif path.startswith("/tareas/"):
+            relative = path[len("/tareas/"):]
+            if relative and not relative.endswith("/"):
+                self.handle_clasificada_file_get(relative)
+            else:
+                super().do_GET()
         else:
             super().do_GET()
 
@@ -92,6 +98,30 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, str(e))
 
+    def handle_clasificada_file_get(self, relative):
+        import urllib.parse
+
+        filename = urllib.parse.unquote(relative)
+        filepath = os.path.join(TASKS_DIR, filename)
+
+        if not os.path.realpath(filepath).startswith(os.path.realpath(TASKS_DIR)):
+            self.send_error(403, "Forbidden")
+            return
+
+        if not os.path.isfile(filepath):
+            self.send_error(404, "Not found")
+            return
+
+        try:
+            with open(filepath, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(data)
+        except Exception as e:
+            self.send_error(500, str(e))
+
     def list_pool_json(self):
         try:
             entries = sorted(
@@ -135,10 +165,12 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(b"</body>\n</html>\n")
 
     def do_PUT(self):
-        filepath = unquote(self.path.strip("/"))
-        full_path = os.path.join(TASKS_DIR, filepath)
+        raw = unquote(self.path.strip("/"))
+        if raw.startswith("tareas/"):
+            raw = raw[len("tareas/"):]
+        full_path = os.path.join(TASKS_DIR, raw)
 
-        if not full_path.startswith(TASKS_DIR):
+        if not os.path.realpath(full_path).startswith(os.path.realpath(TASKS_DIR)):
             self.send_error(403, "Forbidden")
             return
 
@@ -176,7 +208,7 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_permanent_delete(filename[len("papelera/"):])
             else:
                 self.handle_trash_task(filename)
-        elif path == "tareas" and "proyecto" in qs:
+        elif (path == "tareas" or path == "") and "proyecto" in qs:
             self.handle_trash_project(qs["proyecto"][0])
         elif path == "papelera":
             self.handle_empty_trash()
@@ -198,35 +230,6 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
         if not filename.endswith(".json"):
             filename += ".json"
         self._run_trashtarea(["-d", filename])
-
-    def handle_restore_task(self, path):
-        try:
-            filename = path[len("papelera/"):-len("/restore")]
-            src = os.path.join(PAPELERA_DIR, filename)
-
-            if not os.path.realpath(src).startswith(os.path.realpath(PAPELERA_DIR)):
-                self.send_error(403, "Forbidden")
-                return
-
-            if not os.path.isfile(src):
-                self.send_error(404, "File not found in papelera")
-                return
-
-            dst = os.path.join(TASKS_DIR, filename)
-            os.rename(src, dst)
-
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(b'{"status":"ok"}')
-        except Exception as e:
-            self.send_error(500, str(e))
-
-    def handle_restore_project(self, proyecto):
-        if not proyecto:
-            self.send_error(400, "Missing proyecto")
-            return
-        self._run_trashtarea(["-r", "-p", proyecto])
 
     def _run_trashtarea(self, args):
         try:
@@ -326,8 +329,14 @@ class TasksHandler(http.server.SimpleHTTPRequestHandler):
 
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-            filename = f"{timestamp}.json"
+            base = timestamp
+            filename = f"{base}.json"
             filepath = os.path.join(TASKS_DIR, filename)
+            n = 2
+            while os.path.exists(filepath):
+                filename = f"{base}-{n}.json"
+                filepath = os.path.join(TASKS_DIR, filename)
+                n += 1
 
             tarea = {
                 "Nombre": data.get("nombre", "Sin nombre"),
@@ -450,5 +459,6 @@ if __name__ == "__main__":
     os.makedirs(POOL_DIR, exist_ok=True)
     os.makedirs(PAPELERA_DIR, exist_ok=True)
 
+    socketserver.TCPServer.allow_reuse_address = True
     with socketserver.TCPServer(("", PORT), TasksHandler) as httpd:
         httpd.serve_forever()

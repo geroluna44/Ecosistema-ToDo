@@ -260,3 +260,32 @@
 .sort-option:hover {
   background-color: var(--bg-hover);
 }
+
+.app-undo-toast {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  padding: 10px 16px;
+  background-color: var(--state-blocked);
+  color: var(--text-heading);
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+  animation: toast-slide-in 0.2s ease;
+}
+
+.app-undo-toast span {
+  text-decoration: underline;
+  margin-left: 4px;
+}
+
+.app-undo-toast:hover {
+  background-color: #d94040;
+}
+
+@keyframes toast-slide-in {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
