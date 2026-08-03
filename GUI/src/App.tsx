@@ -130,16 +130,18 @@ function App() {
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
     const factor = e.deltaY > 0 ? 0.90 : 1.10;
+
     setZoom(prev => {
       const newZoom = clamp(prev * factor, 0.25, 5);
-      const rect = viewportRef.current?.getBoundingClientRect();
-      if (rect) {
-        const cx = e.clientX - rect.left;
-        const cy = e.clientY - rect.top;
-        setOffsetX(prevX => cx - (cx - prevX) * (newZoom / prev));
-        setOffsetY(prevY => cy - (cy - prevY) * (newZoom / prev));
-      }
+      const ratio = newZoom / prev;
+      setOffsetX(prevX => cx - (cx - prevX) * ratio);
+      setOffsetY(prevY => cy - (cy - prevY) * ratio);
       return newZoom;
     });
   }, []);

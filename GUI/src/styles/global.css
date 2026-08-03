@@ -50,7 +50,6 @@
 .tree-transform-layer {
   transform-origin: 0 0;
   width: max-content;
-  transition: transform 0.1s ease;
 }
 
 .view-selector {
