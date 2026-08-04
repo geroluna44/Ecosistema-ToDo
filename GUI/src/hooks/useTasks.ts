@@ -69,10 +69,10 @@ export function buildSkillTree(tasks: Map<string, Tarea>): Map<string, TareaRela
   
   const childCount = new Map<string, number>();
   taskArray.forEach(([, task]) => {
-    const parent = task['Tarea Padre'];
-    if (parent) {
+    const parents = task['Tarea Padre'] || [];
+    parents.forEach(parent => {
       childCount.set(parent, (childCount.get(parent) || 0) + 1);
-    }
+    });
   });
 
   const nivelCache = new Map<string, number>();
@@ -81,12 +81,13 @@ export function buildSkillTree(tasks: Map<string, Tarea>): Map<string, TareaRela
     if (cached !== undefined) return cached;
     
     const task = tasks.get(filename);
-    if (!task || !task['Tarea Padre']) {
+    const parents = task?.['Tarea Padre'] || [];
+    if (!task || parents.length === 0) {
       nivelCache.set(filename, 0);
       return 0;
     }
     
-    const nivel = 1 + calculateNivel(task['Tarea Padre']);
+    const nivel = 1 + Math.min(...parents.map(p => calculateNivel(p)));
     nivelCache.set(filename, nivel);
     return nivel;
   };
@@ -100,7 +101,8 @@ export function buildSkillTree(tasks: Map<string, Tarea>): Map<string, TareaRela
 
   taskArray.forEach(([filename, task]) => {
     const nivel = calculateNivel(filename);
-    const esRaiz = !task['Tarea Padre'];
+    const parents = task['Tarea Padre'] || [];
+    const esRaiz = parents.length === 0;
     
     const tieneHijosPendientes = (childCount.get(filename) || 0) > 0 && 
       !completedSet.has(filename);

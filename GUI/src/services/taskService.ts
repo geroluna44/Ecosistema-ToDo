@@ -7,6 +7,11 @@ export function resolveTaskName(id: string, tasks: Map<string, Tarea>): string {
   return `${task.Nombre} (${id})`;
 }
 
+export function resolveTaskNames(ids: string[], tasks: Map<string, Tarea>): string {
+  if (!ids || ids.length === 0) return '';
+  return ids.map(id => resolveTaskName(id, tasks)).join(', ');
+}
+
 export function resolveTaskId(displayName: string, tasks: Map<string, Tarea>): string {
   if (!displayName) return '';
   const trimmed = displayName.trim();
@@ -18,11 +23,21 @@ export function resolveTaskId(displayName: string, tasks: Map<string, Tarea>): s
   return '';
 }
 
+export function resolveTaskIds(displayNames: string, tasks: Map<string, Tarea>): string[] {
+  if (!displayNames) return [];
+  return displayNames.split(',').map(name => resolveTaskId(name.trim(), tasks)).filter(id => id !== '');
+}
+
 export function formatTaskDisplay(id: string, tasks: Map<string, Tarea>): string {
   if (!id) return '';
   const task = tasks.get(id);
   if (!task) return id;
   return `${task.Nombre} (${id})`;
+}
+
+export function formatTasksDisplay(ids: string[], tasks: Map<string, Tarea>): string {
+  if (!ids || ids.length === 0) return '';
+  return ids.map(id => formatTaskDisplay(id, tasks)).join(', ');
 }
 
 const TASKS_DIR = '/home/gero/tareas/clasificadas';
@@ -117,6 +132,20 @@ export function getDebugMode(): boolean {
   return isDebugMode;
 }
 
+function normalizeTask(raw: any): Tarea {
+  const normalizeRelation = (value: any): string[] => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string' && value.trim()) return [value];
+    return [];
+  };
+
+  return {
+    ...raw,
+    'Tarea Padre': normalizeRelation(raw['Tarea Padre']),
+    'Tarea Hija': normalizeRelation(raw['Tarea Hija']),
+  };
+}
+
 export async function readTasks(): Promise<Map<string, Tarea>> {
   const tasks = new Map<string, Tarea>();
 
@@ -140,7 +169,8 @@ export async function readTasks(): Promise<Map<string, Tarea>> {
         try {
           const fileResponse = await fetch(serverConfig.getUrl(filename));
           if (fileResponse.ok) {
-            return { filename, task: await fileResponse.json() as Tarea };
+            const rawTask = await fileResponse.json();
+            return { filename, task: normalizeTask(rawTask) };
           }
         } catch (e) {
           console.warn(`Error reading ${filename}:`, e);
@@ -163,9 +193,14 @@ export async function readTasks(): Promise<Map<string, Tarea>> {
 }
 
 export async function writeTask(filename: string, task: Tarea): Promise<void> {
+  const payload = {
+    ...task,
+    'Tarea Padre': task['Tarea Padre'] || [],
+    'Tarea Hija': task['Tarea Hija'] || [],
+  };
   const response = await fetch(serverConfig.putUrl(filename), {
     method: 'PUT',
-    body: JSON.stringify(task, null, 4),
+    body: JSON.stringify(payload, null, 4),
     headers: {
       'Content-Type': 'application/json',
     },
@@ -190,21 +225,24 @@ export interface ClasificadaTaskInput {
   rango_tiempo: number;
   urgencia: 'A' | 'B' | 'C';
   deadline: number;
-  tarea_padre: string;
-  tarea_hija: string;
+  tarea_padre: string[];
+  tarea_hija: string[];
 }
 
 export async function updateConnection(filename: string, parentFilename: string, tasks: Map<string, Tarea>): Promise<void> {
   const task = tasks.get(filename);
   if (!task) throw new Error(`Task ${filename} not found`);
-  const updated: Tarea = { ...task, 'Tarea Padre': parentFilename };
-  await writeTask(filename, updated);
+  const currentParents = task['Tarea Padre'] || [];
+  if (!currentParents.includes(parentFilename)) {
+    const updated: Tarea = { ...task, 'Tarea Padre': [...currentParents, parentFilename] };
+    await writeTask(filename, updated);
+  }
 }
 
 export async function removeConnection(filename: string, tasks: Map<string, Tarea>): Promise<void> {
   const task = tasks.get(filename);
   if (!task) throw new Error(`Task ${filename} not found`);
-  const updated: Tarea = { ...task, 'Tarea Padre': '' };
+  const updated: Tarea = { ...task, 'Tarea Padre': [] };
   await writeTask(filename, updated);
 }
 
@@ -249,7 +287,8 @@ export async function readPapeleraTasks(): Promise<Map<string, Tarea>> {
           const fileUrl = isDevelopment ? serverConfig.papeleraGetUrl(filename) : `${PAPELERA_DIR}/${filename}`;
           const fileResponse = await fetch(fileUrl);
           if (fileResponse.ok) {
-            return { filename, task: await fileResponse.json() as Tarea };
+            const rawTask = await fileResponse.json();
+            return { filename, task: normalizeTask(rawTask) };
           }
         } catch (e) {
           console.warn(`Error reading papelera file ${filename}:`, e);
@@ -293,9 +332,14 @@ export async function restoreProject(proyecto: string): Promise<void> {
 }
 
 export async function createClasificadaTask(input: ClasificadaTaskInput): Promise<{ filename: string }> {
+  const payload = {
+    ...input,
+    tarea_padre: input.tarea_padre && input.tarea_padre.length > 0 ? input.tarea_padre.join(',') : '',
+    tarea_hija: input.tarea_hija && input.tarea_hija.length > 0 ? input.tarea_hija.join(',') : '',
+  };
   const response = await fetch(serverConfig.postTaskUrl, {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify(payload),
     headers: {
       'Content-Type': 'application/json',
     },

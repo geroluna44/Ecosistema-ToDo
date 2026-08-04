@@ -9,6 +9,7 @@ Uso:
   trashtarea -r -p PROYECTO
   trashtarea -e, --empty
   trashtarea -d ARCHIVO.json [ARCHIVO2.json ...]
+  trashtarea --dir DIRECTORIO [args]  # usar directorio custom
 
 Comandos:
   (sin flag)           Mueve uno o mas archivos .json de clasificadas/ a papelera/.
@@ -18,6 +19,7 @@ Comandos:
   -r, --restore        Restaura uno o mas archivos .json de papelera/ a clasificadas/.
   -r -p PROYECTO       Restaura todas las tareas de PROYECTO.
   -e, --empty          Vacia la papelera permanentemente (pide confirmacion).
+  --dir DIRECTORIO     Usar DIRECTORIO como base en vez de ~/tareas/
 
 Exit codes:
   0   exito
@@ -32,8 +34,9 @@ import os
 import sys
 from pathlib import Path
 
-CLASIFICADAS = Path.home() / "tareas" / "clasificadas"
-PAPELERA = Path.home() / "tareas" / "papelera"
+BASE_DIR = Path.home() / "tareas"
+CLASIFICADAS = BASE_DIR / "clasificadas"
+PAPELERA = BASE_DIR / "papelera"
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +246,8 @@ def main() -> int:
             "  trashtarea -r 20260727183902.json\n"
             "  trashtarea -r -p \"Proyecto X\"\n"
             "  trashtarea -d 20260727183902.json\n"
-            "  trashtarea -e"
+            "  trashtarea -e\n"
+            "  trashtarea --dir ~/tareas/debug 20260727183902.json"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -261,8 +265,16 @@ def main() -> int:
                         help="Vaciar la papelera permanentemente")
     parser.add_argument("-f", "--force", action="store_true",
                         help="Saltar confirmacion al vaciar la papelera")
+    parser.add_argument("--dir", metavar="DIRECTORIO",
+                        help="Directorio base (default: ~/tareas/)")
 
     args = parser.parse_args()
+
+    if args.dir:
+        global BASE_DIR, CLASIFICADAS, PAPELERA
+        BASE_DIR = Path(args.dir).expanduser()
+        CLASIFICADAS = BASE_DIR / "clasificadas"
+        PAPELERA = BASE_DIR / "papelera"
 
     # --list
     if args.list:

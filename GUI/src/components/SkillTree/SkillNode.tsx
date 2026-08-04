@@ -36,8 +36,9 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, 
   const stickyRef = useRef<HTMLDivElement>(null);
 
   const { isBlocked, isPosterged, status } = useMemo(() => {
-    const parentTask = tarea['Tarea Padre'] ? tasksMap.get(tarea['Tarea Padre']) : null;
-    const blocked = parentTask && !parentTask.completado;
+    const parents = tarea['Tarea Padre'] || [];
+    const parentTasks = parents.map(p => tasksMap.get(p)).filter(p => p !== undefined);
+    const blocked = parentTasks.some(p => !p!.completado);
     const postponed = tarea.Postergaciones > 0;
 
     let nodeStatus: 'available' | 'blocked' | 'completed' | 'postponed' = 'available';

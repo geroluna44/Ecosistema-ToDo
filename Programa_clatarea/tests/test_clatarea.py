@@ -137,5 +137,189 @@ class TestGuardarCargarTarea(unittest.TestCase):
             clatarea.cargar_tarea("no-existe.json")
 
 
+class TestNormalizarALista(unittest.TestCase):
+    def test_string_vacio(self):
+        self.assertEqual(clatarea.normalizar_a_lista(""), [])
+
+    def test_none(self):
+        self.assertEqual(clatarea.normalizar_a_lista(None), [])
+
+    def test_string_simple(self):
+        self.assertEqual(clatarea.normalizar_a_lista("a.json"), ["a.json"])
+
+    def test_lista(self):
+        self.assertEqual(clatarea.normalizar_a_lista(["a.json", "b.json"]), ["a.json", "b.json"])
+
+    def test_lista_un_elemento(self):
+        self.assertEqual(clatarea.normalizar_a_lista(["a.json"]), ["a.json"])
+
+    def test_lista_vacia(self):
+        self.assertEqual(clatarea.normalizar_a_lista([]), [])
+
+
+class TestSincronizarRelacion(unittest.TestCase):
+    def setUp(self):
+        self.clasificadas = Path(tempfile.mkdtemp())
+        self.original_clasificadas = clatarea.CLASIFICADAS_DIR
+        clatarea.CLASIFICADAS_DIR = self.clasificadas
+
+    def tearDown(self):
+        clatarea.CLASIFICADAS_DIR = self.original_clasificadas
+
+    def test_sincronizar_padre(self):
+        clatarea.guardar_tarea("hija.json", {"Nombre": "Hija"})
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre"})
+        clatarea.sincronizar_relacion("hija.json", "Tarea Padre", "padre.json")
+        padre = clatarea.cargar_tarea("padre.json")
+        self.assertEqual(padre["Tarea Hija"], ["hija.json"])
+
+    def test_sincronizar_hija(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre"})
+        clatarea.guardar_tarea("hija.json", {"Nombre": "Hija"})
+        clatarea.sincronizar_relacion("padre.json", "Tarea Hija", "hija.json")
+        hija = clatarea.cargar_tarea("hija.json")
+        self.assertEqual(hija["Tarea Padre"], ["padre.json"])
+
+    def test_sincronizar_agrega_a_lista_existente(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre", "Tarea Hija": ["otra.json"]})
+        clatarea.guardar_tarea("hija.json", {"Nombre": "Hija"})
+        clatarea.sincronizar_relacion("hija.json", "Tarea Padre", "padre.json")
+        padre = clatarea.cargar_tarea("padre.json")
+        self.assertEqual(padre["Tarea Hija"], ["otra.json", "hija.json"])
+
+    def test_sincronizar_no_duplica(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre", "Tarea Hija": ["hija.json"]})
+        clatarea.sincronizar_relacion("hija.json", "Tarea Padre", "padre.json")
+        padre = clatarea.cargar_tarea("padre.json")
+        self.assertEqual(padre["Tarea Hija"], ["hija.json"])
+
+    def test_sincronizar_crea_tarea_referenciada(self):
+        clatarea.sincronizar_relacion("origen.json", "Tarea Padre", "nueva.json")
+        nueva = clatarea.cargar_tarea("nueva.json")
+        self.assertEqual(nueva["Tarea Hija"], ["origen.json"])
+
+
+class TestDesincronizarRelacion(unittest.TestCase):
+    def setUp(self):
+        self.clasificadas = Path(tempfile.mkdtemp())
+        self.original_clasificadas = clatarea.CLASIFICADAS_DIR
+        clatarea.CLASIFICADAS_DIR = self.clasificadas
+
+    def tearDown(self):
+        clatarea.CLASIFICADAS_DIR = self.original_clasificadas
+
+    def test_desincronizar_padre(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre", "Tarea Hija": ["hija.json"]})
+        clatarea.desincronizar_relacion("hija.json", "Tarea Padre", "padre.json")
+        padre = clatarea.cargar_tarea("padre.json")
+        self.assertEqual(padre["Tarea Hija"], [])
+
+    def test_desincronizar_hija(self):
+        clatarea.guardar_tarea("hija.json", {"Nombre": "Hija", "Tarea Padre": ["padre.json"]})
+        clatarea.desincronizar_relacion("padre.json", "Tarea Hija", "hija.json")
+        hija = clatarea.cargar_tarea("hija.json")
+        self.assertEqual(hija["Tarea Padre"], [])
+
+    def test_desincronizar_no_afecta_otros(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre", "Tarea Hija": ["hija1.json", "hija2.json"]})
+        clatarea.desincronizar_relacion("hija1.json", "Tarea Padre", "padre.json")
+        padre = clatarea.cargar_tarea("padre.json")
+        self.assertEqual(padre["Tarea Hija"], ["hija2.json"])
+
+    def test_desincronizar_valor_vacio_no_opera(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre", "Tarea Hija": ["hija.json"]})
+        clatarea.desincronizar_relacion("hija.json", "Tarea Padre", "")
+        padre = clatarea.cargar_tarea("padre.json")
+        self.assertEqual(padre["Tarea Hija"], ["hija.json"])
+
+    def test_desincronizar_archivo_no_existe_no_error(self):
+        clatarea.desincronizar_relacion("hija.json", "Tarea Padre", "fantasma.json")
+        self.assertTrue(True)
+
+
+class TestSincronizarRelaciones(unittest.TestCase):
+    def setUp(self):
+        self.clasificadas = Path(tempfile.mkdtemp())
+        self.original_clasificadas = clatarea.CLASIFICADAS_DIR
+        clatarea.CLASIFICADAS_DIR = self.clasificadas
+
+    def tearDown(self):
+        clatarea.CLASIFICADAS_DIR = self.original_clasificadas
+
+    def test_sincronizar_multiples_padres(self):
+        clatarea.guardar_tarea("hija.json", {"Nombre": "Hija"})
+        clatarea.guardar_tarea("padre1.json", {"Nombre": "Padre 1"})
+        clatarea.guardar_tarea("padre2.json", {"Nombre": "Padre 2"})
+        clatarea.sincronizar_relaciones("hija.json", "Tarea Padre", ["padre1.json", "padre2.json"])
+        padre1 = clatarea.cargar_tarea("padre1.json")
+        padre2 = clatarea.cargar_tarea("padre2.json")
+        self.assertEqual(padre1["Tarea Hija"], ["hija.json"])
+        self.assertEqual(padre2["Tarea Hija"], ["hija.json"])
+
+    def test_sincronizar_multiples_hijas(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre"})
+        clatarea.guardar_tarea("hija1.json", {"Nombre": "Hija 1"})
+        clatarea.guardar_tarea("hija2.json", {"Nombre": "Hija 2"})
+        clatarea.sincronizar_relaciones("padre.json", "Tarea Hija", ["hija1.json", "hija2.json"])
+        hija1 = clatarea.cargar_tarea("hija1.json")
+        hija2 = clatarea.cargar_tarea("hija2.json")
+        self.assertEqual(hija1["Tarea Padre"], ["padre.json"])
+        self.assertEqual(hija2["Tarea Padre"], ["padre.json"])
+
+
+class TestDesincronizarRelaciones(unittest.TestCase):
+    def setUp(self):
+        self.clasificadas = Path(tempfile.mkdtemp())
+        self.original_clasificadas = clatarea.CLASIFICADAS_DIR
+        clatarea.CLASIFICADAS_DIR = self.clasificadas
+
+    def tearDown(self):
+        clatarea.CLASIFICADAS_DIR = self.original_clasificadas
+
+    def test_desincronizar_multiples_padres(self):
+        clatarea.guardar_tarea("hija.json", {"Nombre": "Hija"})
+        clatarea.guardar_tarea("padre1.json", {"Nombre": "Padre 1", "Tarea Hija": ["hija.json"]})
+        clatarea.guardar_tarea("padre2.json", {"Nombre": "Padre 2", "Tarea Hija": ["hija.json"]})
+        clatarea.desincronizar_relaciones("hija.json", "Tarea Padre", ["padre1.json", "padre2.json"])
+        padre1 = clatarea.cargar_tarea("padre1.json")
+        padre2 = clatarea.cargar_tarea("padre2.json")
+        self.assertEqual(padre1["Tarea Hija"], [])
+        self.assertEqual(padre2["Tarea Hija"], [])
+
+    def test_desincronizar_multiples_hijas(self):
+        clatarea.guardar_tarea("padre.json", {"Nombre": "Padre"})
+        clatarea.guardar_tarea("hija1.json", {"Nombre": "Hija 1", "Tarea Padre": ["padre.json"]})
+        clatarea.guardar_tarea("hija2.json", {"Nombre": "Hija 2", "Tarea Padre": ["padre.json"]})
+        clatarea.desincronizar_relaciones("padre.json", "Tarea Hija", ["hija1.json", "hija2.json"])
+        hija1 = clatarea.cargar_tarea("hija1.json")
+        hija2 = clatarea.cargar_tarea("hija2.json")
+        self.assertEqual(hija1["Tarea Padre"], [])
+        self.assertEqual(hija2["Tarea Padre"], [])
+
+
+class TestDirFlag(unittest.TestCase):
+    def setUp(self):
+        self.custom_dir = Path(tempfile.mkdtemp())
+        self.original_clasificadas = clatarea.CLASIFICADAS_DIR
+
+    def tearDown(self):
+        clatarea.CLASIFICADAS_DIR = self.original_clasificadas
+
+    def test_dir_flag_changes_directory(self):
+        clatarea.CLASIFICADAS_DIR = self.custom_dir
+        clatarea.guardar_tarea("test.json", {"Nombre": "Test"})
+        resultado = clatarea.cargar_tarea("test.json")
+        self.assertEqual(resultado["Nombre"], "Test")
+        self.assertTrue((self.custom_dir / "test.json").exists())
+
+    def test_dir_flag_creates_directory(self):
+        new_dir = self.custom_dir / "nuevo"
+        clatarea.CLASIFICADAS_DIR = new_dir
+        new_dir.mkdir(parents=True, exist_ok=True)
+        clatarea.guardar_tarea("test.json", {"Nombre": "Test"})
+        self.assertTrue(new_dir.exists())
+        self.assertTrue((new_dir / "test.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()

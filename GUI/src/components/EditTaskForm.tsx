@@ -29,7 +29,7 @@ export function EditTaskForm({ filename, task, tasks, onClose, onSaved }: EditTa
     return Array.from(set).sort();
   }, [tasks]);
 
-  const handleChange = (field: keyof Tarea, value: string | number | boolean) => {
+  const handleChange = (field: keyof Tarea, value: string | number | boolean | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -150,17 +150,17 @@ export function EditTaskForm({ filename, task, tasks, onClose, onSaved }: EditTa
             <TaskReferenceInput
               id="edit-padre"
               label="Tarea Padre"
-              value={formData['Tarea Padre']}
+              value={formData['Tarea Padre'] || []}
               tasks={tasks}
-              onChange={id => handleChange('Tarea Padre', id)}
+              onChange={ids => handleChange('Tarea Padre', ids)}
               placeholder="Escribir nombre..."
             />
             <TaskReferenceInput
               id="edit-hija"
               label="Tarea Hija"
-              value={formData['Tarea Hija']}
+              value={formData['Tarea Hija'] || []}
               tasks={tasks}
-              onChange={id => handleChange('Tarea Hija', id)}
+              onChange={ids => handleChange('Tarea Hija', ids)}
               placeholder="Escribir nombre..."
             />
           </div>

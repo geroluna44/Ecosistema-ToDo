@@ -35,8 +35,9 @@ interface ConnectorLine {
 
 function getStatus(task: TareaRelacionada, tasksMap: Map<string, TareaRelacionada>): string {
   if (task.completado) return 'completed';
-  const parentTask = task['Tarea Padre'] ? tasksMap.get(task['Tarea Padre']) : null;
-  if (parentTask && !parentTask.completado) return 'blocked';
+  const parents = task['Tarea Padre'] || [];
+  const parentTasks = parents.map(p => tasksMap.get(p)).filter(p => p !== undefined);
+  if (parentTasks.some(p => !p!.completado)) return 'blocked';
   if (task.Postergaciones > 0) return 'postponed';
   return 'available';
 }
@@ -128,12 +129,12 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
 
     const childrenMap = new Map<string, string[]>();
     tasksMap.forEach((task) => {
-      const parentId = task['Tarea Padre'];
-      if (parentId) {
+      const parents = task['Tarea Padre'] || [];
+      parents.forEach(parentId => {
         const list = childrenMap.get(parentId) || [];
         list.push(task.id);
         childrenMap.set(parentId, list);
-      }
+      });
     });
 
     const pairPositions = new Map<string, {
@@ -157,8 +158,8 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
 
       const byEdge = new Map<Edge, PendingConn[]>();
 
-      const parentId = task['Tarea Padre'];
-      if (parentId) {
+      const parents = task['Tarea Padre'] || [];
+      parents.forEach(parentId => {
         const parentPos = nodePositions.get(parentId);
         if (parentPos) {
           const edge = determineEdge(
@@ -170,7 +171,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
           list.push({ type: 'input', status, pairKey: `${parentId}->${nodeId}` });
           byEdge.set(edge, list);
         }
-      }
+      });
 
       const children = childrenMap.get(nodeId) || [];
       children.forEach((childId) => {

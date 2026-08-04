@@ -8,6 +8,7 @@ from pathlib import Path
 
 POOL_DIR = Path.home() / "tareas" / "pool"
 CLASIFICADAS_DIR = Path.home() / "tareas" / "clasificadas"
+BASE_DIR = Path.home() / "tareas"
 CLASIFICADAS_DIR.mkdir(parents=True, exist_ok=True)
 
 CAMPS_FIJOS = {
@@ -138,6 +139,66 @@ def guardar_tarea(nombre_archivo, datos):
         json.dump(datos, f, ensure_ascii=False, indent=4)
 
 
+def normalizar_a_lista(valor):
+    if isinstance(valor, list):
+        return valor
+    if not valor or valor.strip() == "":
+        return []
+    if isinstance(valor, str):
+        if "," in valor:
+            return [v.strip() for v in valor.split(",") if v.strip()]
+        return [valor]
+    return []
+
+
+def sincronizar_relacion(nombre_archivo, campo, valor_nuevo):
+    try:
+        otra_tarea = cargar_tarea(valor_nuevo)
+    except FileNotFoundError:
+        otra_tarea = {}
+    if campo == "Tarea Padre":
+        campo_inverso = "Tarea Hija"
+    else:
+        campo_inverso = "Tarea Padre"
+    lista_actual = normalizar_a_lista(otra_tarea.get(campo_inverso, []))
+    if nombre_archivo not in lista_actual:
+        lista_actual.append(nombre_archivo)
+    otra_tarea[campo_inverso] = lista_actual
+    guardar_tarea(valor_nuevo, otra_tarea)
+
+
+def desincronizar_relacion(nombre_archivo, campo, valor_viejo):
+    if not valor_viejo:
+        return
+    viejos = normalizar_a_lista(valor_viejo)
+    for archivo_viejo in viejos:
+        try:
+            otra_tarea = cargar_tarea(archivo_viejo)
+        except FileNotFoundError:
+            continue
+        if campo == "Tarea Padre":
+            campo_inverso = "Tarea Hija"
+        else:
+            campo_inverso = "Tarea Padre"
+        lista_actual = normalizar_a_lista(otra_tarea.get(campo_inverso, []))
+        if nombre_archivo in lista_actual:
+            lista_actual.remove(nombre_archivo)
+        otra_tarea[campo_inverso] = lista_actual
+        guardar_tarea(archivo_viejo, otra_tarea)
+
+
+def sincronizar_relaciones(nombre_archivo, campo, valores_nuevos):
+    valores = normalizar_a_lista(valores_nuevos)
+    for valor in valores:
+        sincronizar_relacion(nombre_archivo, campo, valor)
+
+
+def desincronizar_relaciones(nombre_archivo, campo, valores_viejos):
+    valores = normalizar_a_lista(valores_viejos)
+    for valor in valores:
+        desincronizar_relacion(nombre_archivo, campo, valor)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="clatarea",
@@ -168,8 +229,20 @@ Campos validos:
         metavar="CAMPO=VALOR",
         help="Par CAMPO=VALOR a modificar/agregar (usar -m varias veces para varios campos)",
     )
+    parser.add_argument(
+        "--dir",
+        metavar="DIRECTORIO",
+        help="Directorio de tareas clasificadas (default: ~/tareas/clasificadas/)",
+    )
 
     args = parser.parse_args()
+
+    if args.dir:
+        global CLASIFICADAS_DIR, POOL_DIR, BASE_DIR
+        BASE_DIR = Path(args.dir)
+        CLASIFICADAS_DIR = BASE_DIR / "clasificadas"
+        POOL_DIR = BASE_DIR / "pool"
+        CLASIFICADAS_DIR.mkdir(parents=True, exist_ok=True)
 
     if not args.archivo and not args.name:
         parser.error("Se requiere 'archivo' o '-n/--name'")
@@ -187,9 +260,19 @@ Campos validos:
         if args.archivo:
             if args.archivo.endswith(".json"):
                 datos = cargar_tarea(args.archivo)
+                valor_viejo_padre = normalizar_a_lista(datos.get("Tarea Padre", []))
+                valor_viejo_hija = normalizar_a_lista(datos.get("Tarea Hija", []))
                 datos.update(mods)
                 guardar_tarea(args.archivo, datos)
                 print(f"Tarea '{args.archivo}' modificada")
+                if "Tarea Padre" in mods:
+                    desincronizar_relaciones(args.archivo, "Tarea Padre", valor_viejo_padre)
+                    if mods["Tarea Padre"]:
+                        sincronizar_relaciones(args.archivo, "Tarea Padre", mods["Tarea Padre"])
+                if "Tarea Hija" in mods:
+                    desincronizar_relaciones(args.archivo, "Tarea Hija", valor_viejo_hija)
+                    if mods["Tarea Hija"]:
+                        sincronizar_relaciones(args.archivo, "Tarea Hija", mods["Tarea Hija"])
             else:
                 nombre_txt = args.archivo if args.archivo.endswith(".txt") else f"{args.archivo}.txt"
                 contenido_txt = leer_desde_txt(nombre_txt)
@@ -201,6 +284,10 @@ Campos validos:
                 guardar_tarea(nombre_json, datos)
                 (POOL_DIR / nombre_txt).unlink()
                 print(f"Tarea '{nombre_json}' creada desde '{nombre_txt}'")
+                if "Tarea Padre" in mods and mods["Tarea Padre"]:
+                    sincronizar_relaciones(nombre_json, "Tarea Padre", mods["Tarea Padre"])
+                if "Tarea Hija" in mods and mods["Tarea Hija"]:
+                    sincronizar_relaciones(nombre_json, "Tarea Hija", mods["Tarea Hija"])
         else:
             ts = generar_timestamp_base()
             nombre_json = generar_nombre_archivo(ts)
@@ -208,6 +295,10 @@ Campos validos:
             datos.update(mods)
             guardar_tarea(nombre_json, datos)
             print(f"Tarea '{nombre_json}' creada")
+            if "Tarea Padre" in mods and mods["Tarea Padre"]:
+                sincronizar_relaciones(nombre_json, "Tarea Padre", mods["Tarea Padre"])
+            if "Tarea Hija" in mods and mods["Tarea Hija"]:
+                sincronizar_relaciones(nombre_json, "Tarea Hija", mods["Tarea Hija"])
 
     except FileNotFoundError as e:
         print(e, file=sys.stderr)

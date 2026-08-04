@@ -5,9 +5,9 @@ import './task-reference-input.css';
 interface TaskReferenceInputProps {
   id?: string;
   label: string;
-  value: string;
+  value: string[];
   tasks: Map<string, Tarea>;
-  onChange: (taskId: string) => void;
+  onChange: (taskIds: string[]) => void;
   placeholder?: string;
 }
 
@@ -18,18 +18,19 @@ export function TaskReferenceInput({ id, label, value, tasks, onChange, placehol
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedTask = value ? tasks.get(value) : null;
+  const safeValue = Array.isArray(value) ? value : (typeof value === 'string' && value ? [value] : []);
+  const selectedTasks = safeValue.filter(id => tasks.has(id)).map(id => ({ id, nombre: tasks.get(id)!.Nombre }));
 
   const filtered = useMemo(() => {
     const q = query.toLowerCase().trim();
     const entries: Array<{ id: string; nombre: string }> = [];
     tasks.forEach((task, id) => {
-      if (!q || task.Nombre.toLowerCase().includes(q) || id.toLowerCase().includes(q)) {
+      if (!safeValue.includes(id) && (!q || task.Nombre.toLowerCase().includes(q) || id.toLowerCase().includes(q))) {
         entries.push({ id, nombre: task.Nombre });
       }
     });
     return entries.slice(0, 20);
-  }, [query, tasks]);
+  }, [query, tasks, safeValue]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -42,15 +43,14 @@ export function TaskReferenceInput({ id, label, value, tasks, onChange, placehol
   }, []);
 
   const handleSelect = (taskId: string) => {
-    onChange(taskId);
+    onChange([...safeValue, taskId]);
     setQuery('');
     setIsOpen(false);
     setHighlightedIndex(0);
   };
 
-  const handleClear = () => {
-    onChange('');
-    setQuery('');
+  const handleRemove = (taskId: string) => {
+    onChange(safeValue.filter(id => id !== taskId));
     inputRef.current?.focus();
   };
 
@@ -81,15 +81,15 @@ export function TaskReferenceInput({ id, label, value, tasks, onChange, placehol
     <div className="task-ref-container" ref={containerRef}>
       <label htmlFor={id}>{label}</label>
       <div className="task-ref-input-wrap">
-        {selectedTask && (
-          <span className="task-ref-selected">
-            <span className="task-ref-selected-name" title={`${selectedTask.Nombre} (${value})`}>
-              {selectedTask.Nombre}
+        {selectedTasks.map(task => (
+          <span key={task.id} className="task-ref-selected">
+            <span className="task-ref-selected-name" title={`${task.nombre} (${task.id})`}>
+              {task.nombre}
             </span>
-            <span className="task-ref-id">{value}</span>
-            <button type="button" className="task-ref-clear" onClick={handleClear}>×</button>
+            <span className="task-ref-id">{task.id}</span>
+            <button type="button" className="task-ref-clear" onClick={() => handleRemove(task.id)}>×</button>
           </span>
-        )}
+        ))}
         <input
           id={id}
           ref={inputRef}
@@ -101,9 +101,9 @@ export function TaskReferenceInput({ id, label, value, tasks, onChange, placehol
             setIsOpen(true);
             setHighlightedIndex(0);
           }}
-          onFocus={() => { if (query || !selectedTask) setIsOpen(true); }}
+          onFocus={() => { if (query || selectedTasks.length === 0) setIsOpen(true); }}
           onKeyDown={handleKeyDown}
-          placeholder={selectedTask ? '' : (placeholder || 'Escribir nombre...')}
+          placeholder={selectedTasks.length > 0 ? '' : (placeholder || 'Escribir nombre...')}
           disabled={false}
         />
       </div>
@@ -112,7 +112,7 @@ export function TaskReferenceInput({ id, label, value, tasks, onChange, placehol
           {filtered.map((entry, i) => (
             <li
               key={entry.id}
-              className={`task-ref-option ${i === highlightedIndex ? 'highlighted' : ''} ${entry.id === value ? 'selected' : ''}`}
+              className={`task-ref-option ${i === highlightedIndex ? 'highlighted' : ''} ${safeValue.includes(entry.id) ? 'selected' : ''}`}
               onMouseDown={() => handleSelect(entry.id)}
               onMouseEnter={() => setHighlightedIndex(i)}
             >

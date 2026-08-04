@@ -136,8 +136,8 @@ function QuickTaskForm({ tasks, onClose, onReload }: { tasks: Map<string, Tarea>
     rango_tiempo: 30,
     urgencia: 'C',
     deadline: 0,
-    tarea_padre: '',
-    tarea_hija: '',
+    tarea_padre: [],
+    tarea_hija: [],
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -154,7 +154,7 @@ function QuickTaskForm({ tasks, onClose, onReload }: { tasks: Map<string, Tarea>
     return Array.from(set).sort();
   }, [tasks]);
 
-  const handleChange = (field: keyof ClasificadaTaskInput, value: string | number) => {
+  const handleChange = (field: keyof ClasificadaTaskInput, value: string | number | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -176,8 +176,8 @@ function QuickTaskForm({ tasks, onClose, onReload }: { tasks: Map<string, Tarea>
         rango_tiempo: 30,
         urgencia: 'C',
         deadline: 0,
-        tarea_padre: '',
-        tarea_hija: '',
+        tarea_padre: [],
+        tarea_hija: [],
       });
       onReload?.();
       onClose();

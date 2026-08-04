@@ -10,8 +10,8 @@ export interface Tarea {
   Postergaciones: number;
   Urgencia: Urgencia;
   Deadline: number;
-  'Tarea Padre': string;
-  'Tarea Hija': string;
+  'Tarea Padre': string[];
+  'Tarea Hija': string[];
   completado?: boolean;
 }
 

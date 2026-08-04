@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Tarea } from '../../types/task';
 import { AdvancedFilter, ClasificadasFilter, EMPTY_FILTER, applyFilter } from './AdvancedFilter';
-import { formatTaskDisplay } from '../../services/taskService';
+import { formatTasksDisplay } from '../../services/taskService';
 
 type SortColumn = 'id' | 'nombre' | 'lugar' | 'proyecto' | 'descripcion' | 'primerPaso' | 'rangoTiempo' | 'postergaciones' | 'urgencia' | 'padre' | 'hija' | 'deadline';
 type SortDir = 'asc' | 'desc';
@@ -83,9 +83,9 @@ function compareValue(a: Tarea, b: Tarea, column: SortColumn, tasks: Map<string,
       return (order[a.Urgencia] ?? 99) - (order[b.Urgencia] ?? 99);
     }
     case 'padre':
-      return formatTaskDisplay(a['Tarea Padre'] || '', tasks).localeCompare(formatTaskDisplay(b['Tarea Padre'] || '', tasks));
+      return formatTasksDisplay(a['Tarea Padre'] || [], tasks).localeCompare(formatTasksDisplay(b['Tarea Padre'] || [], tasks));
     case 'hija':
-      return formatTaskDisplay(a['Tarea Hija'] || '', tasks).localeCompare(formatTaskDisplay(b['Tarea Hija'] || '', tasks));
+      return formatTasksDisplay(a['Tarea Hija'] || [], tasks).localeCompare(formatTasksDisplay(b['Tarea Hija'] || [], tasks));
     case 'deadline':
       return (a.Deadline || 0) - (b.Deadline || 0);
   }
@@ -315,10 +315,10 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
                       </td>
                     )}
                     {visibleColumns.has('padre') && (
-                      <td className="col-rel" title={formatTaskDisplay(task['Tarea Padre'], tasks)}>{formatTaskDisplay(task['Tarea Padre'], tasks) || '—'}</td>
+                      <td className="col-rel" title={formatTasksDisplay(task['Tarea Padre'] || [], tasks)}>{formatTasksDisplay(task['Tarea Padre'] || [], tasks) || '—'}</td>
                     )}
                     {visibleColumns.has('hija') && (
-                      <td className="col-rel" title={formatTaskDisplay(task['Tarea Hija'], tasks)}>{formatTaskDisplay(task['Tarea Hija'], tasks) || '—'}</td>
+                      <td className="col-rel" title={formatTasksDisplay(task['Tarea Hija'] || [], tasks)}>{formatTasksDisplay(task['Tarea Hija'] || [], tasks) || '—'}</td>
                     )}
                     {visibleColumns.has('deadline') && (
                       <td className="col-deadline">

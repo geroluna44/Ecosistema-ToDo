@@ -63,8 +63,8 @@ clatarea [ARCHIVO | -n "NOMBRE"] -m CAMPO=VALOR [-m CAMPO=VALOR ...]
     "Postergaciones": 1,
     "Urgencia": "A",
     "Deadline": 20260728120000,
-    "Tarea Padre": "20260727183901.json",
-    "Tarea Hija": "20260727183900.json"
+    "Tarea Padre": ["20260727183901.json"],
+    "Tarea Hija": ["20260727183900.json", "20260727183905.json"]
 }
 ```
 
@@ -78,12 +78,14 @@ clatarea [ARCHIVO | -n "NOMBRE"] -m CAMPO=VALOR [-m CAMPO=VALOR ...]
 - `Postergaciones` (int) - manejado por otro programa del ecosistema
 - `Urgencia` (str: "A", "B" o "C")
 - `Deadline` (int, timestamp YYYYMMDDHHMMSS)
-- `Tarea Padre` (str, filename.json) - manejado por otro programa
-- `Tarea Hija` (str, filename.json) - manejado por otro programa
+- `Tarea Padre` (list[str]) - lista de filenames.json de tareas padres
+- `Tarea Hija` (list[str]) - lista de filenames.json de tareas hijas
 
 **Notas:**
 - `Primer paso` es el paso mínimo para iniciar la tarea (antipostcrastinación)
 - Los timestamps usan formato `YYYYMMDDHHMMSS` (14 dígitos)
+- Los campos `Tarea Padre` y `Tarea Hija` son listas que soportan múltiples relaciones
+- La sincronización es bidireccional: al asignar un padre/hija, la otra tarea se actualiza automáticamente
 
 ### Normalización de campos
 
@@ -102,3 +104,25 @@ Los nombres de campo en `-m` son **case-insensitive** y soportan formas abreviad
 | `deadline` | `Deadline` |
 | `tareapadre`, `tarea_padre`, `padre` | `Tarea Padre` |
 | `tareahija`, `tarea_hija`, `tarea_hijo`, `hija` | `Tarea Hija` |
+
+### Sincronización bidireccional de relaciones
+
+Cuando se asigna o modifica un campo `Tarea Padre` o `Tarea Hija`, la otra tarea se actualiza automáticamente:
+
+- **Asignar padre:** `clatarea B.json -m padre=A.json`
+  - En B.json se escribe `"Tarea Padre": ["A.json"]`
+  - En A.json se escribe/agrega `"Tarea Hija": ["B.json"]`
+
+- **Asignar hija:** `clatarea A.json -m hija=B.json`
+  - En A.json se escribe `"Tarea Hija": ["B.json"]`
+  - En B.json se escribe/agrega `"Tarea Padre": ["A.json"]`
+
+- **Desasignar:** usar valor vacío `clatarea B.json -m padre=`
+  - Se limpia `"Tarea Padre"` en B.json
+  - Se remueve B.json de `"Tarea Hija"` en A.json
+
+- **Múltiples relaciones:** cada tarea puede tener múltiples padres e hijos
+  - `clatarea B.json -m padre=A.json` → B tiene padre A
+  - `clatarea C.json -m padre=A.json` → C también tiene padre A, y A tiene hijos [B, C]
+
+- **Tarea referenciada inexistente:** se crea automáticamente con un JSON mínimo

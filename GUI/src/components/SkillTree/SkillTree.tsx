@@ -59,12 +59,12 @@ function computeLayout(
 
   const childrenMap = new Map<string, string[]>();
   tasksMap.forEach((task) => {
-    const parentId = task['Tarea Padre'];
-    if (parentId) {
+    const parents = task['Tarea Padre'] || [];
+    parents.forEach(parentId => {
       const list = childrenMap.get(parentId) || [];
       list.push(task.id);
       childrenMap.set(parentId, list);
-    }
+    });
   });
 
   const subtreeWidth = (nodeId: string): number => {

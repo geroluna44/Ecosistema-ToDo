@@ -19,8 +19,8 @@ export function ClasificarTaskForm({ poolTask, tasks, onClose, onClasificado }: 
   const [rangoTiempo, setRangoTiempo] = useState(30);
   const [urgencia, setUrgencia] = useState<'A' | 'B' | 'C'>('C');
   const [deadline, setDeadline] = useState('');
-  const [tareaPadre, setTareaPadre] = useState('');
-  const [tareaHija, setTareaHija] = useState('');
+  const [tareaPadre, setTareaPadre] = useState<string[]>([]);
+  const [tareaHija, setTareaHija] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -53,8 +53,8 @@ export function ClasificarTaskForm({ poolTask, tasks, onClose, onClasificado }: 
       rango_tiempo: rangoTiempo > 0 ? rangoTiempo : undefined,
       urgencia,
       deadline: deadline ? parseInt(deadline, 10) || 0 : undefined,
-      tarea_padre: tareaPadre.trim() || undefined,
-      tarea_hija: tareaHija.trim() || undefined,
+      tarea_padre: tareaPadre.length > 0 ? tareaPadre.join(',') : undefined,
+      tarea_hija: tareaHija.length > 0 ? tareaHija.join(',') : undefined,
     };
 
     try {
