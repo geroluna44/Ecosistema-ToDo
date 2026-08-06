@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Vista } from '../types/task';
 
 interface ViewSelectorProps {
@@ -7,7 +7,19 @@ interface ViewSelectorProps {
 }
 
 export function ViewSelector({ vistaActiva, onVistaChange }: ViewSelectorProps) {
-  const [minimized, setMinimized] = useState(false);
+  const [minimized, setMinimized] = useState(() => {
+    try {
+      return localStorage.getItem('viewSelectorMinimized') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('viewSelectorMinimized', String(minimized));
+    } catch {}
+  }, [minimized]);
 
   return (
     <div className={`view-selector ${minimized ? 'minimized' : ''}`}>
@@ -45,8 +57,9 @@ export function ViewSelector({ vistaActiva, onVistaChange }: ViewSelectorProps) 
         className="view-selector-toggle"
         onClick={() => setMinimized(!minimized)}
         title={minimized ? 'Mostrar selector' : 'Ocultar selector'}
+        aria-label={minimized ? 'Mostrar selector de vistas' : 'Ocultar selector de vistas'}
       >
-        {minimized ? '▶' : '◀'}
+        {minimized ? '‹' : '›'}
       </button>
     </div>
   );

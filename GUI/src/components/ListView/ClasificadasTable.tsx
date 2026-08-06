@@ -3,8 +3,9 @@ import { Tarea } from '../../types/task';
 import { AdvancedFilter, ClasificadasFilter, EMPTY_FILTER, applyFilter } from './AdvancedFilter';
 import { formatTasksDisplay } from '../../services/taskService';
 import { formatDeadline, formatDuration } from '../../utils/dateFormatting';
+import { MosaicView } from './MosaicView';
 
-type SortColumn = 'id' | 'nombre' | 'lugar' | 'proyecto' | 'descripcion' | 'primerPaso' | 'rangoTiempo' | 'postergaciones' | 'urgencia' | 'padre' | 'hija' | 'deadline';
+export type SortColumn = 'id' | 'nombre' | 'lugar' | 'proyecto' | 'descripcion' | 'primerPaso' | 'rangoTiempo' | 'postergaciones' | 'urgencia' | 'padre' | 'hija' | 'deadline';
 type SortDir = 'asc' | 'desc';
 
 const COLUMN_META: Record<SortColumn, { label: string }> = {
@@ -45,6 +46,7 @@ function loadPersistedFilter(): ClasificadasFilter {
 
 interface ClasificadasTableProps {
   tasks: Map<string, Tarea>;
+  viewMode: 'tabla' | 'mosaico';
   onEdit: (filename: string) => void;
   onTrash: (filename: string) => void;
   onToggleComplete: (filename: string) => void;
@@ -125,11 +127,17 @@ function SortableTh({
   );
 }
 
-export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: ClasificadasTableProps) {
+export function ClasificadasTable({ tasks, viewMode, onEdit, onTrash, onToggleComplete }: ClasificadasTableProps) {
   const [sortColumn, setSortColumn] = useState<SortColumn>('urgencia');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [filter, setFilter] = useState<ClasificadasFilter>(loadPersistedFilter);
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(() => {
+    try {
+      return localStorage.getItem('advancedFilterOpen') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<Set<SortColumn>>(() => new Set(DEFAULT_VISIBLE));
@@ -141,6 +149,12 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
       localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filter));
     } catch {}
   }, [filter]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('advancedFilterOpen', String(filterOpen));
+    } catch {}
+  }, [filterOpen]);
 
   useEffect(() => {
     if (!selectedFilename) return;
@@ -278,9 +292,18 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
           </button>
         ))}
       </div>
-      <div className="list-view-table-wrap" ref={tableRef}>
+      <div className={`list-view-table-wrap ${viewMode === 'mosaico' ? 'mosaic-view-wrap' : ''}`} ref={tableRef}>
         {filteredAndSorted.length === 0 ? (
           <div className="list-view-empty">Sin tareas para mostrar</div>
+        ) : viewMode === 'mosaico' ? (
+          <MosaicView
+            entries={filteredAndSorted}
+            visibleColumns={visibleColumns}
+            tasks={tasks}
+            onEdit={onEdit}
+            onTrash={onTrash}
+            onToggleComplete={onToggleComplete}
+          />
         ) : (
           <table className="list-view-table">
             <thead>

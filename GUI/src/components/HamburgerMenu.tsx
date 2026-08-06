@@ -8,8 +8,20 @@ interface HamburgerMenuProps {
 }
 
 export function HamburgerMenu({ onSelectPapelera, debugMode, onToggleDebug }: HamburgerMenuProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem('hamburgerMenuOpen') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hamburgerMenuOpen', String(open));
+    } catch {}
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

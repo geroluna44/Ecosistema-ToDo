@@ -3,7 +3,7 @@ import { Tarea, PoolTask, ListMode } from '../../types/task';
 import { ClasificadasTable } from './ClasificadasTable';
 import { PoolList } from './PoolList';
 import { ClasificarTaskForm } from './ClasificarTaskForm';
-import { TextZoomControls } from './TextZoomControls';
+import { PresentationModeToggle } from './PresentationModeToggle';
 import './list-view.css';
 
 interface ListViewProps {
@@ -15,15 +15,13 @@ interface ListViewProps {
   onReload: () => void;
 }
 
-function clamp(val: number, min: number, max: number) {
-  return Math.min(Math.max(val, min), max);
-}
-
 const MODE_LABELS: Record<ListMode, string> = {
   clasificadas: 'Clasificadas',
   pool: 'Pool',
   both: 'Clasificadas + Pool',
 };
+
+type ClassifiedViewMode = 'tabla' | 'mosaico';
 
 export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, onReload }: ListViewProps) {
   const [mode, setMode] = useState<ListMode>(() => {
@@ -35,8 +33,21 @@ export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, 
       return 'clasificadas';
     }
   });
-  const [modeOpen, setModeOpen] = useState(false);
-  const [zoom, setZoom] = useState(1);
+  const [modeOpen, setModeOpen] = useState(() => {
+    try {
+      return localStorage.getItem('listViewModeMenuOpen') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [classifiedViewMode, setClassifiedViewMode] = useState<ClassifiedViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('classifiedViewMode');
+      return saved === 'mosaico' ? 'mosaico' : 'tabla';
+    } catch {
+      return 'tabla';
+    }
+  });
   const [clasificarTarget, setClasificarTarget] = useState<PoolTask | null>(null);
 
   const modeRef = useRef<HTMLDivElement>(null);
@@ -46,6 +57,18 @@ export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, 
       localStorage.setItem('listViewMode', mode);
     } catch {}
   }, [mode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('classifiedViewMode', classifiedViewMode);
+    } catch {}
+  }, [classifiedViewMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('listViewModeMenuOpen', String(modeOpen));
+    } catch {}
+  }, [modeOpen]);
 
   useEffect(() => {
     if (!modeOpen) return;
@@ -58,15 +81,9 @@ export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, 
     return () => document.removeEventListener('mousedown', handleClick);
   }, [modeOpen]);
 
-  const zoomIn = () => setZoom(z => clamp(z + 0.1, 0.5, 2));
-  const zoomOut = () => setZoom(z => clamp(z - 0.1, 0.5, 2));
-  const zoomReset = () => setZoom(1);
-
-  const fontSize = `${Math.round(zoom * 100)}%`;
-
   const renderClasificadas = () => (
     <div className="list-view-pane">
-      <ClasificadasTable tasks={tasks} onEdit={onEdit} onTrash={onTrash} onToggleComplete={onToggleComplete} />
+      <ClasificadasTable tasks={tasks} viewMode={classifiedViewMode} onEdit={onEdit} onTrash={onTrash} onToggleComplete={onToggleComplete} />
     </div>
   );
 
@@ -80,7 +97,7 @@ export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, 
   );
 
   return (
-    <div className="list-view" style={{ fontSize }}>
+    <div className="list-view">
       <div className={`list-view-content ${mode === 'both' ? 'both' : 'single'}`}>
         {mode === 'clasificadas' && renderClasificadas()}
         {mode === 'pool' && renderPool()}
@@ -117,12 +134,7 @@ export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, 
         )}
       </div>
 
-      <TextZoomControls
-        zoom={zoom}
-        onZoomIn={zoomIn}
-        onZoomOut={zoomOut}
-        onZoomReset={zoomReset}
-      />
+      <PresentationModeToggle mode={classifiedViewMode} onChange={setClassifiedViewMode} />
 
       {clasificarTarget && (
         <ClasificarTaskForm

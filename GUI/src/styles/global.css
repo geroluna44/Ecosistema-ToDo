@@ -58,15 +58,15 @@
   right: 12px;
   z-index: 100;
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  gap: 6px;
+  padding: 5px;
   background-color: var(--bg-card);
   border-radius: 8px;
   border: 1px solid var(--bg-hover);
 }
 
 .view-selector.minimized {
-  padding: 4px 8px;
+  padding: 5px;
 }
 
 .view-selector.minimized .view-selector-icons {
@@ -97,11 +97,24 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
-  font-size: 12px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
   color: var(--text-muted);
-  border-left: 1px solid var(--bg-hover);
-  margin-left: 4px;
+  border-radius: 6px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.view-selector-toggle:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.view-selector-toggle:focus-visible {
+  outline: 2px solid var(--state-available);
+  outline-offset: 2px;
 }
 
 .loading,

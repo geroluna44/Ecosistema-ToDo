@@ -42,7 +42,13 @@ function App() {
 
   const [isPanning, setIsPanning] = useState(false);
   const [layoutVersion, setLayoutVersion] = useState(0);
-  const [sortOpen, setSortOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(() => {
+    try {
+      return localStorage.getItem('treeSortMenuOpen') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [connectionMode, setConnectionMode] = useState('proyecto');
   const [modifyingNodeId, setModifyingNodeId] = useState<string | null>(null);
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null);
@@ -79,6 +85,12 @@ function App() {
     } catch {}
     setDebugMode(debugMode);
   }, [debugMode]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('treeSortMenuOpen', String(sortOpen));
+    } catch {}
+  }, [sortOpen]);
 
   const skillTreeData = useMemo(() => {
     return buildSkillTree(tasks);

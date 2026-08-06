@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface ZoomControlsProps {
   zoom: number;
@@ -10,8 +10,20 @@ interface ZoomControlsProps {
 }
 
 export function ZoomControls({ zoom, onZoomIn, onZoomOut, onZoomReset, onPanBy, onPanHome }: ZoomControlsProps) {
-  const [minimized, setMinimized] = useState(false);
+  const [minimized, setMinimized] = useState(() => {
+    try {
+      return localStorage.getItem('zoomControlsMinimized') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const intervalRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('zoomControlsMinimized', String(minimized));
+    } catch {}
+  }, [minimized]);
 
   const startPan = useCallback((dx: number, dy: number) => {
     const step = 60 / zoom;
@@ -92,8 +104,9 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onZoomReset, onPanBy, 
         className="zoom-controls-toggle"
         onClick={() => setMinimized(!minimized)}
         title={minimized ? 'Mostrar controles' : 'Ocultar controles'}
+        aria-label={minimized ? 'Mostrar controles de zoom' : 'Ocultar controles de zoom'}
       >
-        {minimized ? '▶' : '◀'}
+        {minimized ? '›' : '‹'}
       </button>
     </div>
   );
