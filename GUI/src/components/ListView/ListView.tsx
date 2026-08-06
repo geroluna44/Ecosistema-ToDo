@@ -26,12 +26,26 @@ const MODE_LABELS: Record<ListMode, string> = {
 };
 
 export function ListView({ tasks, poolTasks, onEdit, onTrash, onToggleComplete, onReload }: ListViewProps) {
-  const [mode, setMode] = useState<ListMode>('clasificadas');
+  const [mode, setMode] = useState<ListMode>(() => {
+    try {
+      const saved = localStorage.getItem('listViewMode');
+      const validModes: ListMode[] = ['clasificadas', 'pool', 'both'];
+      return saved && validModes.includes(saved as ListMode) ? saved as ListMode : 'clasificadas';
+    } catch {
+      return 'clasificadas';
+    }
+  });
   const [modeOpen, setModeOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [clasificarTarget, setClasificarTarget] = useState<PoolTask | null>(null);
 
   const modeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('listViewMode', mode);
+    } catch {}
+  }, [mode]);
 
   useEffect(() => {
     if (!modeOpen) return;

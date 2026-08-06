@@ -401,14 +401,9 @@ export interface ClasificarPoolInput {
 }
 
 function parsePoolTxt(filename: string, content: string): PoolTask {
-  const trimmed = content.replace(/\r\n/g, '\n').trim();
-  if (!trimmed) {
-    const stem = filename.replace(/\.txt$/i, '');
-    return { filename, nombre: stem, descripcion: '' };
-  }
-  const parts = trimmed.split(/\n{2,}/);
-  const nombre = (parts[0] ?? '').trim() || filename.replace(/\.txt$/i, '');
-  const descripcion = parts.slice(1).join('\n\n').trim();
+  const nombre = filename.replace(/\.txt$/i, '');
+  const descripcion = content.replace(/\r\n/g, '\n').trim();
+
   return { filename, nombre, descripcion };
 }
 

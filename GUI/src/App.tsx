@@ -26,7 +26,15 @@ interface UndoToast {
 
 function App() {
   const { tasks, poolTasks, loading, error, toggleComplete, reload } = useTasks();
-  const [vistaActiva, setVistaActiva] = useState<Vista>('lista');
+  const [vistaActiva, setVistaActiva] = useState<Vista>(() => {
+    try {
+      const saved = localStorage.getItem('vistaActiva');
+      const validViews: Vista[] = ['lista', 'arbol', 'calendario', 'nodos', 'papelera'];
+      return (saved && validViews.includes(saved as Vista)) ? saved as Vista : 'lista';
+    } catch {
+      return 'lista';
+    }
+  });
   const [zoom, setZoom] = useState(1);
   const [offsetX, setOffsetX] = useState(0);
   const [offsetY, setOffsetY] = useState(0);
@@ -39,7 +47,13 @@ function App() {
   const [modifyingNodeId, setModifyingNodeId] = useState<string | null>(null);
   const [undoToast, setUndoToast] = useState<UndoToast | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [debugMode, setDebugModeState] = useState(false);
+  const [debugMode, setDebugModeState] = useState(() => {
+    try {
+      return localStorage.getItem('debugMode') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousViewRef = useRef<Vista>('lista');
   const sortRef = useRef<HTMLDivElement>(null);
@@ -52,6 +66,19 @@ function App() {
       if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('vistaActiva', vistaActiva);
+    } catch {}
+  }, [vistaActiva]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('debugMode', String(debugMode));
+    } catch {}
+    setDebugMode(debugMode);
+  }, [debugMode]);
 
   const skillTreeData = useMemo(() => {
     return buildSkillTree(tasks);
