@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, type RefObject } from 'react';
 import { TareaRelacionada } from '../../types/task';
+import { formatDeadline, formatDuration } from '../../utils/dateFormatting';
 import './skill-node.css';
 
 interface SkillNodeProps {
@@ -13,22 +14,6 @@ interface SkillNodeProps {
   onToggleSticky: (id: string) => void;
   onModifyConnections?: (id: string) => void;
   wasDraggedRef?: RefObject<boolean>;
-}
-
-function formatDeadline(deadline: number | undefined): string {
-  if (!deadline) return 'Sin fecha';
-  const str = deadline.toString();
-  const month = str.slice(4, 6);
-  const day = str.slice(6, 8);
-  return `${day}/${month}`;
-}
-
-function formatTime(minutes: number | undefined): string {
-  if (!minutes) return '0m';
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
 export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, onTrashProject, isStickyOpen, onToggleSticky, onModifyConnections, wasDraggedRef }: SkillNodeProps) {
@@ -140,7 +125,7 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, 
         <div className="skill-node-desc">{tarea.Descripcion}</div>
 
         <div className="skill-node-meta">
-          <span className="skill-node-time">⏱ {formatTime(tarea['Rango de tiempo'])}</span>
+          <span className="skill-node-time">⏱ {formatDuration(tarea['Rango de tiempo'])}</span>
           <span className="skill-node-deadline">📅 {formatDeadline(tarea.Deadline)}</span>
           <span className={`skill-node-urgency urgency-${(tarea.Urgencia || 'A').toLowerCase()}`}>
             {tarea.Urgencia || '?'}
@@ -154,7 +139,7 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, 
           <div className="tooltip-project">{tarea.Proyecto}</div>
           <div className="tooltip-desc">{tarea.Descripcion}</div>
           <div className="tooltip-meta">
-            <span className="tooltip-badge">⏱ {formatTime(tarea['Rango de tiempo'])}</span>
+              <span className="tooltip-badge">⏱ {formatDuration(tarea['Rango de tiempo'])}</span>
             <span className="tooltip-badge">📅 {formatDeadline(tarea.Deadline)}</span>
             <span className={`tooltip-badge urgency-${(tarea.Urgencia || 'A').toLowerCase()}`}>
               Urgencia {tarea.Urgencia || '?'}
@@ -175,7 +160,7 @@ export function SkillNode({ tarea, tasksMap, onToggleComplete, onEdit, onTrash, 
           <div className="sticky-info-project">{tarea.Proyecto}</div>
           <div className="sticky-info-desc">{tarea.Descripcion}</div>
           <div className="sticky-info-meta">
-            <span className="sticky-info-badge">⏱ {formatTime(tarea['Rango de tiempo'])}</span>
+              <span className="sticky-info-badge">⏱ {formatDuration(tarea['Rango de tiempo'])}</span>
             <span className="sticky-info-badge">📅 {formatDeadline(tarea.Deadline)}</span>
             <span className={`sticky-info-badge urgency-${(tarea.Urgencia || 'A').toLowerCase()}`}>
               Urgencia {tarea.Urgencia || '?'}

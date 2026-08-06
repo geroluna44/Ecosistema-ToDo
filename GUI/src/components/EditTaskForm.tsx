@@ -3,6 +3,7 @@ import { Tarea, Urgencia } from '../types/task';
 import { writeTask } from '../services/taskService';
 import { TaskReferenceInput } from './TaskReferenceInput';
 import { SuggestionInput } from './SuggestionInput';
+import { deadlineYear, formatDeadline, parseDeadlineInput } from '../utils/dateFormatting';
 
 interface EditTaskFormProps {
   filename: string;
@@ -14,6 +15,10 @@ interface EditTaskFormProps {
 
 export function EditTaskForm({ filename, task, tasks, onClose, onSaved }: EditTaskFormProps) {
   const [formData, setFormData] = useState<Tarea>({ ...task });
+  const [deadlineInput, setDeadlineInput] = useState(() => {
+    const formatted = formatDeadline(task.Deadline);
+    return formatted === 'Sin fecha' ? '' : formatted;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,8 +46,12 @@ export function EditTaskForm({ filename, task, tasks, onClose, onSaved }: EditTa
     setError('');
 
     try {
-      await writeTask(filename, formData);
-      onSaved(filename, formData);
+      const updated = {
+        ...formData,
+        Deadline: parseDeadlineInput(deadlineInput, deadlineYear(task.Deadline)),
+      };
+      await writeTask(filename, updated);
+      onSaved(filename, updated);
       onClose();
     } catch (err) {
       setError('Error al guardar la tarea');
@@ -135,13 +144,13 @@ export function EditTaskForm({ filename, task, tasks, onClose, onSaved }: EditTa
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="edit-deadline">Deadline (YYYYMMDD)</label>
+                <label htmlFor="edit-deadline">Deadline (dd/mm hh:mm)</label>
               <input
                 id="edit-deadline"
-                type="number"
-                value={formData.Deadline || ''}
-                onChange={e => handleChange('Deadline', parseInt(e.target.value) || 0)}
-                placeholder="YYYYMMDD"
+                  type="text"
+                  value={deadlineInput}
+                  onChange={e => setDeadlineInput(e.target.value)}
+                  placeholder="06/08 17:30"
               />
             </div>
           </div>

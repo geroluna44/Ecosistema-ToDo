@@ -3,6 +3,7 @@ import { createPoolTask, createClasificadaTask, ClasificadaTaskInput } from '../
 import { TaskReferenceInput } from './TaskReferenceInput';
 import { SuggestionInput } from './SuggestionInput';
 import { Tarea } from '../types/task';
+import { parseDeadlineInput } from '../utils/dateFormatting';
 
 type MenuState = 'closed' | 'menu' | 'add' | 'quick';
 
@@ -166,7 +167,10 @@ function QuickTaskForm({ tasks, onClose, onReload }: { tasks: Map<string, Tarea>
     setError('');
 
     try {
-      await createClasificadaTask(formData);
+      await createClasificadaTask({
+        ...formData,
+        deadline: parseDeadlineInput(String(formData.deadline || '')),
+      });
       setFormData({
         nombre: '',
         lugar: '',
@@ -272,13 +276,13 @@ function QuickTaskForm({ tasks, onClose, onReload }: { tasks: Map<string, Tarea>
               </select>
             </div>
             <div className="form-group">
-              <label htmlFor="quick-deadline">Deadline (YYYYMMDD)</label>
+              <label htmlFor="quick-deadline">Deadline (dd/mm hh:mm)</label>
               <input
                 id="quick-deadline"
-                type="number"
+                type="text"
                 value={formData.deadline || ''}
-                onChange={e => handleChange('deadline', parseInt(e.target.value) || 0)}
-                placeholder="YYYYMMDD"
+                onChange={e => handleChange('deadline', e.target.value)}
+                placeholder="06/08 17:30"
               />
             </div>
           </div>

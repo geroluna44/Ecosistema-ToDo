@@ -3,6 +3,7 @@ import { Tarea, PoolTask } from '../../types/task';
 import { clasificarPoolTask, ClasificarPoolInput } from '../../services/taskService';
 import { TaskReferenceInput } from '../TaskReferenceInput';
 import { SuggestionInput } from '../SuggestionInput';
+import { parseDeadlineInput } from '../../utils/dateFormatting';
 
 interface ClasificarTaskFormProps {
   poolTask: PoolTask;
@@ -52,7 +53,7 @@ export function ClasificarTaskForm({ poolTask, tasks, onClose, onClasificado }: 
       primer_paso: primerPaso.trim() || undefined,
       rango_tiempo: rangoTiempo > 0 ? rangoTiempo : undefined,
       urgencia,
-      deadline: deadline ? parseInt(deadline, 10) || 0 : undefined,
+      deadline: deadline ? parseDeadlineInput(deadline) || undefined : undefined,
       tarea_padre: tareaPadre.length > 0 ? tareaPadre.join(',') : undefined,
       tarea_hija: tareaHija.length > 0 ? tareaHija.join(',') : undefined,
     };
@@ -140,12 +141,12 @@ export function ClasificarTaskForm({ poolTask, tasks, onClose, onClasificado }: 
           </div>
 
           <div className="form-group">
-            <label>Deadline (YYYYMMDDHHMMSS)</label>
+            <label>Deadline (dd/mm hh:mm)</label>
             <input
               type="text"
               value={deadline}
-              onChange={e => setDeadline(e.target.value.replace(/\D/g, '').slice(0, 14))}
-              placeholder="Opcional"
+              onChange={e => setDeadline(e.target.value)}
+              placeholder="06/08 17:30"
             />
           </div>
 

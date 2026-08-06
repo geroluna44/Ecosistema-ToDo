@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Tarea, Urgencia } from '../../types/task';
 import { formatTasksDisplay } from '../../services/taskService';
+import { parseDeadlineInput } from '../../utils/dateFormatting';
 
 export interface ClasificadasFilter {
   proyecto: string;
@@ -28,13 +29,66 @@ export const EMPTY_FILTER: ClasificadasFilter = {
 
 interface AdvancedFilterProps {
   filter: ClasificadasFilter;
+  tasks: Map<string, Tarea>;
   onApply: (next: ClasificadasFilter) => void;
   onClose: () => void;
 }
 
-export function AdvancedFilter({ filter, onApply, onClose }: AdvancedFilterProps) {
+function unique(values: string[]): string[] {
+  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+}
+
+function AutocompleteField({
+  id,
+  label,
+  value,
+  suggestions,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  suggestions: string[];
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="list-view-filter-field">
+      <label htmlFor={id}>{label}</label>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        list={`${id}-suggestions`}
+      />
+      <datalist id={`${id}-suggestions`}>
+        {suggestions.map(suggestion => (
+          <option key={suggestion} value={suggestion} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
+export function AdvancedFilter({ filter, tasks, onApply, onClose }: AdvancedFilterProps) {
   const [local, setLocal] = useState<ClasificadasFilter>(filter);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const suggestions = {
+    proyecto: unique(Array.from(tasks.values()).map(task => task.Proyecto || '')),
+    nombre: unique(Array.from(tasks.values()).map(task => task.Nombre || '')),
+    descripcion: unique(Array.from(tasks.values()).map(task => task.Descripcion || '')),
+    lugar: unique(Array.from(tasks.values()).map(task => task['Lugar de trabajo'] || '')),
+    padre: unique(Array.from(tasks.values()).flatMap(task =>
+      (task['Tarea Padre'] || []).map(id => formatTasksDisplay([id], tasks))
+    )),
+    hija: unique(Array.from(tasks.values()).flatMap(task =>
+      (task['Tarea Hija'] || []).map(id => formatTasksDisplay([id], tasks))
+    )),
+  };
 
   useEffect(() => {
     setLocal(filter);
@@ -67,45 +121,41 @@ export function AdvancedFilter({ filter, onApply, onClose }: AdvancedFilterProps
     <div className="list-view-filter-panel" ref={panelRef}>
       <div className="list-view-filter-title">Filtro avanzado</div>
 
-      <div className="list-view-filter-field">
-        <label>Proyecto</label>
-        <input
-          type="text"
-          value={local.proyecto}
-          onChange={e => setField('proyecto', e.target.value)}
-          placeholder="Contiene…"
-        />
-      </div>
+      <AutocompleteField
+        id="filter-proyecto"
+        label="Proyecto"
+        value={local.proyecto}
+        suggestions={suggestions.proyecto}
+        onChange={value => setField('proyecto', value)}
+        placeholder="Contiene…"
+      />
 
-      <div className="list-view-filter-field">
-        <label>Nombre</label>
-        <input
-          type="text"
-          value={local.nombre}
-          onChange={e => setField('nombre', e.target.value)}
-          placeholder="Contiene…"
-        />
-      </div>
+      <AutocompleteField
+        id="filter-nombre"
+        label="Nombre"
+        value={local.nombre}
+        suggestions={suggestions.nombre}
+        onChange={value => setField('nombre', value)}
+        placeholder="Contiene…"
+      />
 
-      <div className="list-view-filter-field">
-        <label>Descripción</label>
-        <input
-          type="text"
-          value={local.descripcion}
-          onChange={e => setField('descripcion', e.target.value)}
-          placeholder="Contiene…"
-        />
-      </div>
+      <AutocompleteField
+        id="filter-descripcion"
+        label="Descripción"
+        value={local.descripcion}
+        suggestions={suggestions.descripcion}
+        onChange={value => setField('descripcion', value)}
+        placeholder="Contiene…"
+      />
 
-      <div className="list-view-filter-field">
-        <label>Lugar de trabajo</label>
-        <input
-          type="text"
-          value={local.lugar}
-          onChange={e => setField('lugar', e.target.value)}
-          placeholder="Contiene…"
-        />
-      </div>
+      <AutocompleteField
+        id="filter-lugar"
+        label="Lugar de trabajo"
+        value={local.lugar}
+        suggestions={suggestions.lugar}
+        onChange={value => setField('lugar', value)}
+        placeholder="Contiene…"
+      />
 
       <div className="list-view-filter-field">
         <label>Urgencia</label>
@@ -120,45 +170,41 @@ export function AdvancedFilter({ filter, onApply, onClose }: AdvancedFilterProps
         </select>
       </div>
 
-      <div className="list-view-filter-field">
-        <label>Tarea Padre</label>
-        <input
-          type="text"
-          value={local.padre}
-          onChange={e => setField('padre', e.target.value)}
-          placeholder="Contiene…"
-        />
-      </div>
+      <AutocompleteField
+        id="filter-padre"
+        label="Tarea Padre"
+        value={local.padre}
+        suggestions={suggestions.padre}
+        onChange={value => setField('padre', value)}
+        placeholder="Contiene…"
+      />
+
+      <AutocompleteField
+        id="filter-hija"
+        label="Tarea Hija"
+        value={local.hija}
+        suggestions={suggestions.hija}
+        onChange={value => setField('hija', value)}
+        placeholder="Contiene…"
+      />
 
       <div className="list-view-filter-field">
-        <label>Tarea Hija</label>
-        <input
-          type="text"
-          value={local.hija}
-          onChange={e => setField('hija', e.target.value)}
-          placeholder="Contiene…"
-        />
-      </div>
-
-      <div className="list-view-filter-field">
-        <label>Deadline mínimo (YYYYMMDD)</label>
+        <label>Deadline mínimo (dd/mm hh:mm)</label>
         <input
           type="text"
           value={local.deadlineMin}
           onChange={e => setField('deadlineMin', e.target.value)}
-          placeholder="20260101"
-          maxLength={14}
+          placeholder="06/08 00:00"
         />
       </div>
 
       <div className="list-view-filter-field">
-        <label>Deadline máximo (YYYYMMDD)</label>
+        <label>Deadline máximo (dd/mm hh:mm)</label>
         <input
           type="text"
           value={local.deadlineMax}
           onChange={e => setField('deadlineMax', e.target.value)}
-          placeholder="20261231"
-          maxLength={14}
+          placeholder="31/12 23:59"
         />
       </div>
 
@@ -181,8 +227,8 @@ export function applyFilter(tasks: Array<[string, Tarea]>, filter: ClasificadasF
     return String(value).toLowerCase().includes(needle.toLowerCase());
   };
 
-  const minN = filter.deadlineMin ? parseInt(filter.deadlineMin, 10) : null;
-  const maxN = filter.deadlineMax ? parseInt(filter.deadlineMax, 10) : null;
+  const minN = filter.deadlineMin ? parseDeadlineInput(filter.deadlineMin) : null;
+  const maxN = filter.deadlineMax ? parseDeadlineInput(filter.deadlineMax) : null;
 
   return tasks.filter(([_, task]) => {
     if (!contains(task.Proyecto, filter.proyecto)) return false;

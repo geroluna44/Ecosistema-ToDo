@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { Tarea } from '../../types/task';
 import { AdvancedFilter, ClasificadasFilter, EMPTY_FILTER, applyFilter } from './AdvancedFilter';
 import { formatTasksDisplay } from '../../services/taskService';
+import { formatDeadline, formatDuration } from '../../utils/dateFormatting';
 
 type SortColumn = 'id' | 'nombre' | 'lugar' | 'proyecto' | 'descripcion' | 'primerPaso' | 'rangoTiempo' | 'postergaciones' | 'urgencia' | 'padre' | 'hija' | 'deadline';
 type SortDir = 'asc' | 'desc';
@@ -24,6 +25,23 @@ const COLUMN_META: Record<SortColumn, { label: string }> = {
 const ALWAYS_VISIBLE: SortColumn[] = ['id', 'nombre'];
 const TOGGLEABLE_COLUMNS: SortColumn[] = ['lugar', 'proyecto', 'descripcion', 'primerPaso', 'rangoTiempo', 'postergaciones', 'urgencia', 'padre', 'hija', 'deadline'];
 const DEFAULT_VISIBLE: SortColumn[] = ['id', 'nombre', 'proyecto', 'descripcion', 'urgencia', 'padre', 'hija', 'deadline'];
+const FILTER_STORAGE_KEY = 'clasificadasAdvancedFilter';
+
+function loadPersistedFilter(): ClasificadasFilter {
+  try {
+    const saved = localStorage.getItem(FILTER_STORAGE_KEY);
+    if (!saved) return EMPTY_FILTER;
+    const parsed = JSON.parse(saved) as Partial<ClasificadasFilter>;
+    return {
+      ...EMPTY_FILTER,
+      ...Object.fromEntries(
+        Object.entries(parsed).filter(([key, value]) => key in EMPTY_FILTER && typeof value === 'string')
+      ),
+    } as ClasificadasFilter;
+  } catch {
+    return EMPTY_FILTER;
+  }
+}
 
 interface ClasificadasTableProps {
   tasks: Map<string, Tarea>;
@@ -32,32 +50,25 @@ interface ClasificadasTableProps {
   onToggleComplete: (filename: string) => void;
 }
 
-function formatDeadline(value: number | undefined): { text: string; className: string } {
-  if (!value) return { text: '—', className: '' };
-  const str = String(value);
-  if (str.length < 8) return { text: str, className: '' };
-  const yyyy = str.slice(0, 4);
-  const mm = str.slice(4, 6);
-  const dd = str.slice(6, 8);
-  const hh = str.length >= 10 ? str.slice(8, 10) : '00';
-  const mi = str.length >= 12 ? str.slice(10, 12) : '00';
-  const text = `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+function getDeadlineClass(value: number | undefined): string {
+  if (!value) return '';
+  const digits = String(value);
+  if (digits.length < 8) return '';
 
-  const now = new Date();
   const taskDate = new Date(
-    Number(yyyy),
-    Number(mm) - 1,
-    Number(dd),
-    Number(hh),
-    Number(mi),
+    Number(digits.slice(0, 4)),
+    Number(digits.slice(4, 6)) - 1,
+    Number(digits.slice(6, 8)),
+    Number(digits.slice(8, 10) || 0),
+    Number(digits.slice(10, 12) || 0),
   );
+  const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const isOverdue = taskDate < today;
-  const isToday = taskDate.getTime() === today.getTime();
-  return {
-    text,
-    className: isOverdue ? 'overdue' : isToday ? 'today' : '',
-  };
+  const isToday = taskDate.getFullYear() === today.getFullYear() &&
+    taskDate.getMonth() === today.getMonth() &&
+    taskDate.getDate() === today.getDate();
+  return isOverdue ? 'overdue' : isToday ? 'today' : '';
 }
 
 function compareValue(a: Tarea, b: Tarea, column: SortColumn, tasks: Map<string, Tarea>): number {
@@ -117,13 +128,19 @@ function SortableTh({
 export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: ClasificadasTableProps) {
   const [sortColumn, setSortColumn] = useState<SortColumn>('urgencia');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [filter, setFilter] = useState<ClasificadasFilter>(EMPTY_FILTER);
+  const [filter, setFilter] = useState<ClasificadasFilter>(loadPersistedFilter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<Set<SortColumn>>(() => new Set(DEFAULT_VISIBLE));
   const popupRef = useRef<HTMLDivElement>(null);
   const tableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filter));
+    } catch {}
+  }, [filter]);
 
   useEffect(() => {
     if (!selectedFilename) return;
@@ -239,6 +256,7 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
             {filterOpen && (
               <AdvancedFilter
                 filter={filter}
+                tasks={tasks}
                 onApply={(next) => {
                   setFilter(next);
                   setFilterOpen(false);
@@ -302,7 +320,7 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
                       <td className="col-rel" title={task['Primer paso']}>{task['Primer paso'] || '—'}</td>
                     )}
                     {visibleColumns.has('rangoTiempo') && (
-                      <td className="col-num">{task['Rango de tiempo'] ?? '—'}</td>
+                      <td className="col-num">{formatDuration(task['Rango de tiempo'])}</td>
                     )}
                     {visibleColumns.has('postergaciones') && (
                       <td className="col-num">{task.Postergaciones ?? '—'}</td>
@@ -322,7 +340,9 @@ export function ClasificadasTable({ tasks, onEdit, onTrash, onToggleComplete }: 
                     )}
                     {visibleColumns.has('deadline') && (
                       <td className="col-deadline">
-                        <span className={`list-view-deadline-cell ${deadline.className}`}>{deadline.text}</span>
+                        <span className={`list-view-deadline-cell ${getDeadlineClass(task.Deadline)}`}>
+                          {deadline === 'Sin fecha' ? '—' : deadline}
+                        </span>
                       </td>
                     )}
                   </tr>
