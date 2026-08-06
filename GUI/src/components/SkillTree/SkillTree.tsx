@@ -4,6 +4,8 @@ import { SkillNode } from './SkillNode';
 import { ConnectorOverlay } from './ConnectorOverlay';
 import './skill-tree.css';
 
+export const GRID_SIZE = 40;
+
 interface SkillTreeProps {
   projects: Map<string, TareaRelacionada[]>;
   onToggleComplete: (filename: string) => void;
@@ -11,14 +13,15 @@ interface SkillTreeProps {
   onTrashTask: (filename: string) => void;
   onTrashProject: (proyecto: string) => void;
   onConnect?: (parentId: string, childId: string) => void;
-  onDisconnect?: (childId: string) => void;
+  onDisconnect?: (childId: string, parentId: string) => void;
   zoom: number;
   layoutVersion: number;
   modifyingNodeId: string | null;
   onModifyConnectionsChange: (nodeId: string | null) => void;
+  positionScope: 'normal' | 'debug';
 }
 
-interface NodePosition {
+export interface NodePosition {
   id: string;
   x: number;
   y: number;
@@ -31,6 +34,7 @@ const NODE_H = 120;
 const COL_GAP = 80;
 const ROW_GAP = 60;
 const SIBLING_GAP = 50;
+const POSITION_STORAGE_PREFIX = 'skillTreePositions:';
 
 function checkCollision(
   rect: { x: number; y: number; width: number; height: number },
@@ -51,6 +55,37 @@ function checkCollision(
   return null;
 }
 
+function snapToGrid(value: number): number {
+  return Math.max(0, Math.round(value / GRID_SIZE) * GRID_SIZE);
+}
+
+function readStoredPositions(scope: 'normal' | 'debug'): Map<string, { x: number; y: number }> {
+  try {
+    const raw = localStorage.getItem(`${POSITION_STORAGE_PREFIX}${scope}`);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, { x?: number; y?: number }>;
+    const positions = new Map<string, { x: number; y: number }>();
+    Object.entries(parsed).forEach(([id, position]) => {
+      if (Number.isFinite(position?.x) && Number.isFinite(position?.y)) {
+        positions.set(id, { x: snapToGrid(position.x!), y: snapToGrid(position.y!) });
+      }
+    });
+    return positions;
+  } catch {
+    return new Map();
+  }
+}
+
+function persistPositions(scope: 'normal' | 'debug', positions: Map<string, NodePosition>): void {
+  try {
+    const serializable: Record<string, { x: number; y: number }> = {};
+    positions.forEach((position, id) => {
+      serializable[id] = { x: position.x, y: position.y };
+    });
+    localStorage.setItem(`${POSITION_STORAGE_PREFIX}${scope}`, JSON.stringify(serializable));
+  } catch {}
+}
+
 function computeLayout(
   projects: Map<string, TareaRelacionada[]>,
   tasksMap: Map<string, TareaRelacionada>,
@@ -62,28 +97,50 @@ function computeLayout(
     const parents = task['Tarea Padre'] || [];
     parents.forEach(parentId => {
       const list = childrenMap.get(parentId) || [];
-      list.push(task.id);
+    list.push(task.id);
       childrenMap.set(parentId, list);
     });
   });
+  childrenMap.forEach(children => children.sort((a, b) => a.localeCompare(b)));
 
+  const widthCache = new Map<string, number>();
   const subtreeWidth = (nodeId: string): number => {
-    const children = childrenMap.get(nodeId) || [];
-    if (children.length === 0) return NODE_W;
-    const total = children.reduce((sum, childId, i) => {
-      return sum + subtreeWidth(childId) + (i < children.length - 1 ? SIBLING_GAP : 0);
-    }, 0);
-    return Math.max(NODE_W, total);
+    const cached = widthCache.get(nodeId);
+    if (cached !== undefined) return cached;
+    return subtreeWidthWithPath(nodeId, new Set());
   };
 
-  const layoutSubtree = (nodeId: string, x: number, y: number): void => {
+  const subtreeWidthWithPath = (nodeId: string, visiting: Set<string>): number => {
+    const cached = widthCache.get(nodeId);
+    if (cached !== undefined) return cached;
+    if (visiting.has(nodeId)) return NODE_W;
+
+    const nextVisiting = new Set(visiting);
+    nextVisiting.add(nodeId);
+    const children = childrenMap.get(nodeId) || [];
+    if (children.length === 0) {
+      widthCache.set(nodeId, NODE_W);
+      return NODE_W;
+    }
+    const total = children.reduce((sum, childId, i) => {
+      return sum + subtreeWidthWithPath(childId, nextVisiting) + (i < children.length - 1 ? SIBLING_GAP : 0);
+    }, 0);
+    const width = Math.max(NODE_W, total);
+    widthCache.set(nodeId, width);
+    return width;
+  };
+
+  const layoutSubtree = (nodeId: string, x: number, y: number, visiting = new Set<string>()): void => {
+    if (positions.has(nodeId) || visiting.has(nodeId)) return;
+    const nextVisiting = new Set(visiting);
+    nextVisiting.add(nodeId);
     const children = childrenMap.get(nodeId) || [];
     const width = subtreeWidth(nodeId);
 
     positions.set(nodeId, {
       id: nodeId,
-      x: x + width / 2 - NODE_W / 2,
-      y,
+      x: snapToGrid(x + width / 2 - NODE_W / 2),
+      y: snapToGrid(y),
       width: NODE_W,
       height: NODE_H,
     });
@@ -96,49 +153,77 @@ function computeLayout(
 
       children.forEach((childId) => {
         const childWidth = subtreeWidth(childId);
-        layoutSubtree(childId, childX, y + NODE_H + ROW_GAP);
+        layoutSubtree(childId, childX, y + NODE_H + ROW_GAP, nextVisiting);
         childX += childWidth + SIBLING_GAP;
       });
     }
   };
 
+  const findFreePosition = (x: number, y: number): { x: number; y: number } => {
+    let row = 0;
+    while (row < 10000) {
+      const candidate = {
+        x: snapToGrid(x),
+        y: snapToGrid(y + row * (NODE_H + ROW_GAP)),
+        width: NODE_W,
+        height: NODE_H,
+      };
+      if (!checkCollision(candidate, positions, '')) return { x: candidate.x, y: candidate.y };
+      row += 1;
+    }
+    return { x: snapToGrid(x), y: snapToGrid(y) };
+  };
+
   let colX = 40;
-  projects.forEach((tareas) => {
-    const roots = tareas.filter((t) => t.esRaiz);
-    const nonRoots = tareas.filter((t) => !t.esRaiz);
+  const sortedProjects = Array.from(projects.entries()).sort(([a], [b]) => a.localeCompare(b));
+  sortedProjects.forEach(([, tareas]) => {
+    const sortedTasks = [...tareas].sort((a, b) => a.Nombre.localeCompare(b.Nombre) || a.id.localeCompare(b.id));
+    const roots = sortedTasks.filter((t) => t.esRaiz);
+    const nonRoots = sortedTasks.filter((t) => !t.esRaiz);
 
     let projectX = colX;
-    let maxProjectWidth = 0;
+    let projectWidth = 0;
     roots.forEach((root) => {
       layoutSubtree(root.id, projectX, 40);
       const w = subtreeWidth(root.id);
-      maxProjectWidth = Math.max(maxProjectWidth, w);
       projectX += w + SIBLING_GAP;
     });
+    projectWidth = Math.max(NODE_W, projectX - colX - (roots.length > 0 ? SIBLING_GAP : 0));
 
     nonRoots.forEach((tarea) => {
       if (!positions.has(tarea.id)) {
+        const fallback = findFreePosition(colX, 40);
         positions.set(tarea.id, {
           id: tarea.id,
-          x: colX,
-          y: 40,
+          x: fallback.x,
+          y: fallback.y,
           width: NODE_W,
           height: NODE_H,
         });
       }
     });
 
-    colX += Math.max(NODE_W, maxProjectWidth) + COL_GAP;
+    colX += projectWidth + COL_GAP;
   });
 
   return positions;
 }
 
-export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, onConnect, onDisconnect, zoom, layoutVersion, modifyingNodeId, onModifyConnectionsChange }: SkillTreeProps) {
+export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask, onTrashProject, onConnect, onDisconnect, zoom, layoutVersion, modifyingNodeId, onModifyConnectionsChange, positionScope }: SkillTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ id: string; lastX: number; lastY: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{
+    id: string;
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+    moved: boolean;
+  } | null>(null);
   const wasDraggedRef = useRef(false);
   const zoomRef = useRef(zoom);
+  const hydratedScopeRef = useRef<string | null>(null);
+  const hydratingPositionsRef = useRef(false);
+  const previousLayoutVersionRef = useRef(layoutVersion);
   const [stickyNodeId, setStickyNodeId] = useState<string | null>(null);
   zoomRef.current = zoom;
 
@@ -151,21 +236,51 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
   }, [projects]);
 
   const [nodePositions, setNodePositions] = useState<Map<string, NodePosition>>(() => {
-    return computeLayout(projects, tasksMap);
+    const layout = computeLayout(projects, tasksMap);
+    const stored = readStoredPositions(positionScope);
+    stored.forEach((saved, id) => {
+      const position = layout.get(id);
+      if (position) {
+        layout.set(id, { ...position, x: saved.x, y: saved.y });
+      }
+    });
+    return layout;
   });
 
   useEffect(() => {
+    if (tasksMap.size === 0) return;
+
+    const layout = computeLayout(projects, tasksMap);
+    const shouldHydrate = hydratedScopeRef.current !== positionScope;
+    const stored = shouldHydrate ? readStoredPositions(positionScope) : new Map();
+    hydratingPositionsRef.current = shouldHydrate;
+
     setNodePositions(prev => {
-      const next = new Map(prev);
-      const layout = computeLayout(projects, tasksMap);
+      const next = new Map<string, NodePosition>();
       layout.forEach((pos, id) => {
-        if (!next.has(id)) {
-          next.set(id, pos);
+        const saved = stored.get(id);
+        if (saved) {
+          next.set(id, { ...pos, x: saved.x, y: saved.y });
+        } else {
+          next.set(id, prev.get(id) || pos);
         }
       });
       return next;
     });
-  }, [projects, tasksMap]);
+
+    hydratedScopeRef.current = positionScope;
+  }, [projects, tasksMap, positionScope]);
+
+  useEffect(() => {
+    if (tasksMap.size === 0 || hydratedScopeRef.current !== positionScope) {
+      return;
+    }
+    if (hydratingPositionsRef.current) {
+      hydratingPositionsRef.current = false;
+      return;
+    }
+    persistPositions(positionScope, nodePositions);
+  }, [nodePositions, positionScope, tasksMap.size]);
 
   useEffect(() => {
     const newPositions = new Map(nodePositions);
@@ -189,6 +304,8 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
   }, [projects, nodePositions]);
 
   useEffect(() => {
+    if (previousLayoutVersionRef.current === layoutVersion) return;
+    previousLayoutVersionRef.current = layoutVersion;
     setNodePositions(computeLayout(projects, tasksMap));
   }, [layoutVersion, projects, tasksMap]);
 
@@ -215,8 +332,10 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
 
     dragRef.current = {
       id: taskId,
-      lastX: e.clientX,
-      lastY: e.clientY,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: pos.x,
+      baseY: pos.y,
       moved: false,
     };
 
@@ -224,29 +343,19 @@ export function SkillTree({ projects, onToggleComplete, onEditTask, onTrashTask,
       const d = dragRef.current;
       if (!d) return;
 
-      const dx = (e.clientX - d.lastX) / zoomRef.current;
-      const dy = (e.clientY - d.lastY) / zoomRef.current;
+      const dx = (e.clientX - d.startX) / zoomRef.current;
+      const dy = (e.clientY - d.startY) / zoomRef.current;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
         d.moved = true;
         wasDraggedRef.current = true;
       }
-      d.lastX = e.clientX;
-      d.lastY = e.clientY;
-
       setNodePositions(prev => {
         const p = prev.get(d.id);
         if (!p) return prev;
 
-        const alreadyOverlapping = checkCollision(p, prev, d.id);
-
-        const newX = p.x + dx;
-        const newY = p.y + dy;
+        const newX = snapToGrid(d.baseX + (e.clientX - d.startX) / zoomRef.current);
+        const newY = snapToGrid(d.baseY + (e.clientY - d.startY) / zoomRef.current);
         const next = new Map(prev);
-
-        if (alreadyOverlapping) {
-          next.set(d.id, { ...p, x: newX, y: newY });
-          return next;
-        }
 
         const testFull = { x: newX, y: newY, width: p.width, height: p.height };
         if (!checkCollision(testFull, prev, d.id)) {

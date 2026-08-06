@@ -64,7 +64,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onZoomReset, onPanBy, 
             onTouchStart={() => startPan(1, 0)}
             onTouchEnd={stopPan}
             onTouchCancel={stopPan}
-            title="Izquierda"
+            title="Derecha"
           >←</button>
           <button
             className="dpad-btn dpad-home"
@@ -79,7 +79,7 @@ export function ZoomControls({ zoom, onZoomIn, onZoomOut, onZoomReset, onPanBy, 
             onTouchStart={() => startPan(-1, 0)}
             onTouchEnd={stopPan}
             onTouchCancel={stopPan}
-            title="Derecha"
+            title="Izquierda"
           >→</button>
           <div />
           <button

@@ -13,7 +13,7 @@ interface ConnectorOverlayProps {
   nodePositions: Map<string, NodePosition>;
   tasksMap: Map<string, TareaRelacionada>;
   onConnect?: (parentId: string, childId: string) => void;
-  onDisconnect?: (childId: string) => void;
+  onDisconnect?: (childId: string, parentId: string) => void;
   ghostNodeId?: string | null;
   onModifyConnectionsClick: (nodeId: string) => void;
 }
@@ -27,6 +27,7 @@ interface Connector {
   cy: number;
   status: string;
   nodeId: string;
+  relatedNodeId?: string;
 }
 
 interface ConnectorLine {
@@ -111,6 +112,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
 
   const [disconnectDrag, setDisconnectDrag] = useState<{
     sourceNodeId: string;
+    parentNodeId: string;
     cx: number;
     cy: number;
     startX: number;
@@ -154,6 +156,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
         type: 'input' | 'output';
         status: string;
         pairKey: string;
+        relatedNodeId: string;
       }
 
       const byEdge = new Map<Edge, PendingConn[]>();
@@ -168,7 +171,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
             parentPos.y + parentPos.height / 2
           );
           const list = byEdge.get(edge) || [];
-          list.push({ type: 'input', status, pairKey: `${parentId}->${nodeId}` });
+          list.push({ type: 'input', status, pairKey: `${parentId}->${nodeId}`, relatedNodeId: parentId });
           byEdge.set(edge, list);
         }
       });
@@ -183,7 +186,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
           childPos.y + childPos.height / 2
         );
         const list = byEdge.get(edge) || [];
-        list.push({ type: 'output', status, pairKey: `${nodeId}->${childId}` });
+        list.push({ type: 'output', status, pairKey: `${nodeId}->${childId}`, relatedNodeId: childId });
         byEdge.set(edge, list);
       });
 
@@ -206,7 +209,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
             cy = pos.y + (pos.height / (total + 1)) * (i + 1);
           }
 
-          connectors.push({ type: p.type, edge, cx, cy, status: p.status, nodeId });
+          connectors.push({ type: p.type, edge, cx, cy, status: p.status, nodeId, relatedNodeId: p.relatedNodeId });
 
           if (p.type === 'input') {
             let entry = pairPositions.get(p.pairKey);
@@ -248,6 +251,7 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
 
     setDisconnectDrag({
       sourceNodeId: conn.nodeId,
+      parentNodeId: conn.relatedNodeId || '',
       cx: conn.cx,
       cy: conn.cy,
       startX: e.clientX,
@@ -317,8 +321,8 @@ export function ConnectorOverlay({ nodePositions, tasksMap, onConnect, onDisconn
 
     if (disconnectDragRef.current) {
       const d = disconnectDragRef.current;
-      if (d.moved && onDisconnect) {
-        onDisconnect(d.sourceNodeId);
+      if (d.moved && onDisconnect && d.parentNodeId) {
+        onDisconnect(d.sourceNodeId, d.parentNodeId);
       } else {
         onModifyConnectionsClick(d.sourceNodeId);
       }

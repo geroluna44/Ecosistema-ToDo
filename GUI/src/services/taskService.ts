@@ -135,7 +135,9 @@ export function getDebugMode(): boolean {
 function normalizeTask(raw: any): Tarea {
   const normalizeRelation = (value: any): string[] => {
     if (Array.isArray(value)) return value;
-    if (typeof value === 'string' && value.trim()) return [value];
+    if (typeof value === 'string' && value.trim()) {
+      return value.split(',').map(v => v.trim()).filter(v => v !== '');
+    }
     return [];
   };
 
@@ -239,10 +241,13 @@ export async function updateConnection(filename: string, parentFilename: string,
   }
 }
 
-export async function removeConnection(filename: string, tasks: Map<string, Tarea>): Promise<void> {
+export async function removeConnection(filename: string, parentFilename: string, tasks: Map<string, Tarea>): Promise<void> {
   const task = tasks.get(filename);
   if (!task) throw new Error(`Task ${filename} not found`);
-  const updated: Tarea = { ...task, 'Tarea Padre': [] };
+  const updated: Tarea = {
+    ...task,
+    'Tarea Padre': (task['Tarea Padre'] || []).filter(parent => parent !== parentFilename),
+  };
   await writeTask(filename, updated);
 }
 

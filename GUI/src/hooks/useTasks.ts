@@ -76,9 +76,17 @@ export function buildSkillTree(tasks: Map<string, Tarea>): Map<string, TareaRela
   });
 
   const nivelCache = new Map<string, number>();
-  const calculateNivel = (filename: string): number => {
+  const calculateNivel = (filename: string, visiting = new Set<string>()): number => {
     const cached = nivelCache.get(filename);
     if (cached !== undefined) return cached;
+
+    if (visiting.has(filename)) {
+      nivelCache.set(filename, 0);
+      return 0;
+    }
+
+    const nextVisiting = new Set(visiting);
+    nextVisiting.add(filename);
     
     const task = tasks.get(filename);
     const parents = task?.['Tarea Padre'] || [];
@@ -87,7 +95,7 @@ export function buildSkillTree(tasks: Map<string, Tarea>): Map<string, TareaRela
       return 0;
     }
     
-    const nivel = 1 + Math.min(...parents.map(p => calculateNivel(p)));
+    const nivel = 1 + Math.min(...parents.map(p => calculateNivel(p, nextVisiting)));
     nivelCache.set(filename, nivel);
     return nivel;
   };

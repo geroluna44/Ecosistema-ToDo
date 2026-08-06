@@ -1,6 +1,6 @@
 import { useTasks, buildSkillTree } from './hooks/useTasks';
 import { ViewSelector } from './components/ViewSelector';
-import { SkillTree } from './components/SkillTree/SkillTree';
+import { GRID_SIZE, SkillTree } from './components/SkillTree/SkillTree';
 import { ZoomControls } from './components/ZoomControls';
 import { QuickAddFAB } from './components/QuickAddFAB';
 import { EditTaskForm } from './components/EditTaskForm';
@@ -23,6 +23,14 @@ interface UndoToast {
   filename: string;
   nombre: string;
 }
+
+interface TreeCamera {
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+const CAMERA_STORAGE_PREFIX = 'skillTreeCamera:';
 
 function App() {
   const { tasks, poolTasks, loading, error, toggleComplete, reload } = useTasks();
@@ -61,6 +69,9 @@ function App() {
     }
   });
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cameraScopeRef = useRef<string | null>(null);
+  const hydratingCameraRef = useRef(false);
   const previousViewRef = useRef<Vista>('lista');
   const sortRef = useRef<HTMLDivElement>(null);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -91,6 +102,50 @@ function App() {
       localStorage.setItem('treeSortMenuOpen', String(sortOpen));
     } catch {}
   }, [sortOpen]);
+
+  useEffect(() => {
+    const scope = debugMode ? 'debug' : 'normal';
+    let camera: TreeCamera = { zoom: 1, offsetX: 0, offsetY: 0 };
+
+    try {
+      const saved = localStorage.getItem(`${CAMERA_STORAGE_PREFIX}${scope}`);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<TreeCamera>;
+        camera = {
+          zoom: Number.isFinite(parsed.zoom) ? clamp(parsed.zoom!, 0.25, 5) : 1,
+          offsetX: Number.isFinite(parsed.offsetX) ? parsed.offsetX! : 0,
+          offsetY: Number.isFinite(parsed.offsetY) ? parsed.offsetY! : 0,
+        };
+      }
+    } catch {}
+
+    hydratingCameraRef.current = true;
+    cameraScopeRef.current = scope;
+    setZoom(camera.zoom);
+    setOffsetX(camera.offsetX);
+    setOffsetY(camera.offsetY);
+  }, [debugMode]);
+
+  useEffect(() => {
+    const scope = debugMode ? 'debug' : 'normal';
+    if (cameraScopeRef.current !== scope) return;
+    if (hydratingCameraRef.current) {
+      hydratingCameraRef.current = false;
+      return;
+    }
+
+    if (cameraSaveTimerRef.current) clearTimeout(cameraSaveTimerRef.current);
+    cameraSaveTimerRef.current = setTimeout(() => {
+      try {
+        localStorage.setItem(`${CAMERA_STORAGE_PREFIX}${scope}`, JSON.stringify({ zoom, offsetX, offsetY }));
+      } catch {}
+      cameraSaveTimerRef.current = null;
+    }, 100);
+
+    return () => {
+      if (cameraSaveTimerRef.current) clearTimeout(cameraSaveTimerRef.current);
+    };
+  }, [debugMode, zoom, offsetX, offsetY]);
 
   const skillTreeData = useMemo(() => {
     return buildSkillTree(tasks);
@@ -158,9 +213,9 @@ function App() {
     }
   }, [tasks, reload]);
 
-  const handleDisconnect = useCallback(async (childId: string) => {
+  const handleDisconnect = useCallback(async (childId: string, parentId: string) => {
     try {
-      await removeConnection(childId, tasks);
+      await removeConnection(childId, parentId, tasks);
       reload();
     } catch (e) {
       setActionError(`No se pudo desconectar la tarea: ${e instanceof Error ? e.message : e}`);
@@ -358,6 +413,11 @@ function App() {
           <div
             ref={viewportCallbackRef}
             className={`tree-viewport ${isPanning ? 'panning' : ''}`}
+            style={{
+              '--tree-grid-size': `${GRID_SIZE * zoom}px`,
+              '--tree-grid-offset-x': `${offsetX}px`,
+              '--tree-grid-offset-y': `${offsetY}px`,
+            } as React.CSSProperties}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -381,6 +441,7 @@ function App() {
                 layoutVersion={layoutVersion}
                 modifyingNodeId={modifyingNodeId}
                 onModifyConnectionsChange={handleModifyConnectionsChange}
+                positionScope={debugMode ? 'debug' : 'normal'}
               />
             </div>
             <div className="connection-indicator">{indicatorText}</div>

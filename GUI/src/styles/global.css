@@ -37,6 +37,12 @@
   overflow: hidden;
   position: relative;
   cursor: grab;
+  background-color: var(--bg-main);
+  background-image:
+    linear-gradient(to right, rgba(89, 156, 171, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(89, 156, 171, 0.12) 1px, transparent 1px);
+  background-size: var(--tree-grid-size) var(--tree-grid-size);
+  background-position: var(--tree-grid-offset-x) var(--tree-grid-offset-y);
 }
 
 .tree-viewport.panning {
